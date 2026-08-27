@@ -1,0 +1,452 @@
+// ============================================================
+// نظام إدارة حجوزات الطيران — Prisma Schema
+// مطابق حرفيًا لـ schema.sql
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUM TYPES
+// ============================================================
+
+enum trip_type_enum {
+  one_way
+  round_trip
+}
+
+enum credit_status_enum {
+  NEW
+  TRUSTED
+  RESTRICTED
+}
+
+enum booking_request_status_enum {
+  NEW
+  WAITING_FOR_OFFERS
+  OFFER_SELECTED
+  CONVERTED
+  CANCELLED
+}
+
+enum offer_type_enum {
+  economy
+  business
+  other
+}
+
+enum offer_status_enum {
+  received
+  rejected
+  expired
+  cancelled
+}
+
+enum booking_status_enum {
+  NEW
+  WAITING_PAYMENT
+  WAITING_TICKETING
+  TICKETED
+  COMPLETED
+  CANCELLED
+  PARTIALLY_CANCELLED
+  MODIFIED
+  AT_RISK
+}
+
+enum ticket_status_enum {
+  pending
+  issued
+  modified
+  cancelled
+  refund_pending
+  partially_refunded
+  refunded
+}
+
+enum payment_method_enum {
+  cash
+  instapay
+  vodafone_cash
+}
+
+enum payment_status_enum {
+  pending
+  partially_paid
+  paid
+  overdue
+}
+
+enum responsible_party_enum {
+  customer
+  execution_company
+  owner
+  shared
+}
+
+enum refund_status_enum {
+  pending
+  approved
+  processed
+  rejected
+}
+
+enum alert_type_enum {
+  customer_payment_due
+  execution_payment_due
+  ticket_issue_due
+  travel_date_near
+  unconfirmed_booking
+  unissued_ticket
+  overdue_payment
+  booking_risk
+  refund_pending
+}
+
+enum alert_severity_enum {
+  info
+  warning
+  critical
+}
+
+enum alert_status_enum {
+  open
+  resolved
+}
+
+// ============================================================
+// MODELS
+// ============================================================
+
+model users {
+  id         BigInt   @id @default(autoincrement()) @db.BigInt
+  name       String   @db.VarChar(150)
+  role       String   @default("owner") @db.VarChar(50)
+  created_at DateTime @default(now()) @db.Timestamp()
+
+  activity_logs activity_logs[]
+}
+
+model customers {
+  id            BigInt             @id @default(autoincrement()) @db.BigInt
+  name          String             @db.VarChar(150)
+  phone         String             @db.VarChar(20)
+  address       String?            @db.Text
+  balance       Decimal            @default(0) @db.Decimal(15, 2)
+  credit_status credit_status_enum @default(NEW)
+  currency      String             @default("EGP") @db.VarChar(3)
+  notes         String?            @db.Text
+  created_at    DateTime           @default(now()) @db.Timestamp()
+  updated_at    DateTime           @default(now()) @db.Timestamp()
+
+  booking_requests    booking_requests[]
+  bookings            bookings[]
+  customer_payments   customer_payments[]
+  alerts              alerts[]
+  documents           documents[]
+}
+
+model execution_companies {
+  id            BigInt   @id @default(autoincrement()) @db.BigInt
+  name          String   @db.VarChar(200)
+  contact_person String? @db.VarChar(150)
+  phone         String?  @db.VarChar(20)
+  address       String?  @db.Text
+  balance       Decimal  @default(0) @db.Decimal(15, 2)
+  currency      String   @default("EGP") @db.VarChar(3)
+  created_at    DateTime @default(now()) @db.Timestamp()
+  updated_at    DateTime @default(now()) @db.Timestamp()
+
+  execution_offers   execution_offers[]
+  bookings           bookings[]
+  execution_payments execution_payments[]
+  alerts             alerts[]
+}
+
+model airlines {
+  id         BigInt   @id @default(autoincrement()) @db.BigInt
+  name       String   @db.VarChar(200)
+  code       String?  @db.VarChar(20)
+  created_at DateTime @default(now()) @db.Timestamp()
+  updated_at DateTime @default(now()) @db.Timestamp()
+
+  execution_offers execution_offers[]
+  flight_segments  flight_segments[]
+  tickets          tickets[]
+}
+
+model booking_requests {
+  id               BigInt                      @id @default(autoincrement()) @db.BigInt
+  customer_id      BigInt                      @db.BigInt
+  origin           String                      @db.VarChar(100)
+  destination      String                      @db.VarChar(100)
+  trip_type        trip_type_enum
+  depart_date      DateTime                    @db.Date
+  return_date      DateTime?                   @db.Date
+  passengers_count Int                         @default(1)
+  requirements     String?                     @db.Text
+  status           booking_request_status_enum @default(NEW)
+  notes            String?                     @db.Text
+  created_at       DateTime                    @default(now()) @db.Timestamp()
+  updated_at       DateTime                    @default(now()) @db.Timestamp()
+
+  customer         customers          @relation(fields: [customer_id], references: [id])
+  execution_offers execution_offers[]
+  bookings         bookings[]
+}
+
+model execution_offers {
+  id                   BigInt            @id @default(autoincrement()) @db.BigInt
+  request_id           BigInt            @db.BigInt
+  execution_company_id BigInt            @db.BigInt
+  airline_id           BigInt            @db.BigInt
+  offer_type           offer_type_enum   @default(economy)
+  execution_cost       Decimal           @db.Decimal(15, 2)
+  currency             String            @default("EGP") @db.VarChar(3)
+  flight_details       String?           @db.Text
+  ticketing_deadline   DateTime?         @db.Timestamp()
+  payment_deadline     DateTime?         @db.Timestamp()
+  received_at          DateTime          @default(now()) @db.Timestamp()
+  status               offer_status_enum @default(received)
+  notes                String?           @db.Text
+  created_at           DateTime          @default(now()) @db.Timestamp()
+
+  request           booking_requests    @relation(fields: [request_id], references: [id])
+  execution_company execution_companies @relation(fields: [execution_company_id], references: [id])
+  airline           airlines            @relation(fields: [airline_id], references: [id])
+
+  selected_bookings bookings[]
+}
+
+model bookings {
+  id                    BigInt               @id @default(autoincrement()) @db.BigInt
+  request_id            BigInt?              @db.BigInt
+  customer_id           BigInt               @db.BigInt
+  selected_offer_id     BigInt               @db.BigInt
+  execution_company_id  BigInt               @db.BigInt
+  booking_reference     String?              @db.VarChar(100)
+  booking_status        booking_status_enum  @default(NEW)
+  depart_date           DateTime             @db.Date
+  return_date           DateTime?            @db.Date
+  current_purchase_price Decimal             @default(0) @db.Decimal(15, 2)
+  current_selling_price Decimal              @default(0) @db.Decimal(15, 2)
+  current_profit        Decimal              @default(0) @db.Decimal(15, 2)
+  currency              String               @default("EGP") @db.VarChar(3)
+  issued_before_payment Boolean              @default(false)
+  risk_approved_by      String?              @db.VarChar(150)
+  risk_reason           String?              @db.Text
+  notes                 String?              @db.Text
+  created_at            DateTime             @default(now()) @db.Timestamp()
+  updated_at            DateTime             @default(now()) @db.Timestamp()
+
+  request           booking_requests?   @relation(fields: [request_id], references: [id])
+  customer          customers           @relation(fields: [customer_id], references: [id])
+  selected_offer    execution_offers    @relation(fields: [selected_offer_id], references: [id])
+  execution_company execution_companies @relation(fields: [execution_company_id], references: [id])
+
+  price_history     price_history[]
+  flight_segments   flight_segments[]
+  passengers        passengers[]
+  tickets           tickets[]
+  customer_payments customer_payments[]
+  execution_payments execution_payments[]
+  alerts            alerts[]
+  documents         documents[]
+}
+
+model price_history {
+  id             BigInt   @id @default(autoincrement()) @db.BigInt
+  booking_id     BigInt   @db.BigInt
+  execution_cost Decimal  @db.Decimal(15, 2)
+  selling_price  Decimal  @db.Decimal(15, 2)
+  profit         Decimal  @db.Decimal(15, 2)
+  currency       String   @default("EGP") @db.VarChar(3)
+  changed_at     DateTime @default(now()) @db.Timestamp()
+  changed_by     String?  @db.VarChar(150)
+  reason         String?  @db.Text
+
+  booking bookings @relation(fields: [booking_id], references: [id], onDelete: Cascade)
+}
+
+model flight_segments {
+  id            BigInt   @id @default(autoincrement()) @db.BigInt
+  booking_id    BigInt   @db.BigInt
+  airline_id    BigInt   @db.BigInt
+  segment_order Int
+  from_location String   @db.VarChar(100)
+  to_location   String   @db.VarChar(100)
+  flight_number String?  @db.VarChar(50)
+  departure_at  DateTime @db.Timestamp()
+  arrival_at    DateTime @db.Timestamp()
+  terminal      String?  @db.VarChar(50)
+  class         String?  @db.VarChar(50)
+  baggage       String?  @db.VarChar(50)
+  notes         String?  @db.Text
+
+  booking bookings @relation(fields: [booking_id], references: [id], onDelete: Cascade)
+  airline airlines @relation(fields: [airline_id], references: [id])
+}
+
+model passengers {
+  id              BigInt   @id @default(autoincrement()) @db.BigInt
+  booking_id      BigInt   @db.BigInt
+  name            String   @db.VarChar(150)
+  passport_number String?  @db.VarChar(50)
+  nationality     String?  @db.VarChar(100)
+  date_of_birth   DateTime? @db.Date
+  notes           String?  @db.Text
+
+  booking         bookings          @relation(fields: [booking_id], references: [id], onDelete: Cascade)
+  ticket_passengers ticket_passengers[]
+  documents       documents[]
+}
+
+model tickets {
+  id            BigInt            @id @default(autoincrement()) @db.BigInt
+  booking_id    BigInt            @db.BigInt
+  airline_id    BigInt            @db.BigInt
+  ticket_number String?           @db.VarChar(100)
+  pnr           String?           @db.VarChar(100)
+  ticket_price  Decimal           @db.Decimal(15, 2)
+  currency      String            @default("EGP") @db.VarChar(3)
+  issue_date    DateTime?         @db.Timestamp()
+  status        ticket_status_enum @default(pending)
+  notes         String?           @db.Text
+
+  booking bookings @relation(fields: [booking_id], references: [id], onDelete: Cascade)
+  airline airlines @relation(fields: [airline_id], references: [id])
+
+  ticket_passengers ticket_passengers[]
+  refunds           refunds[]
+  modifications     modifications[]
+  alerts            alerts[]
+}
+
+model ticket_passengers {
+  ticket_id    BigInt   @db.BigInt
+  passenger_id BigInt   @db.BigInt
+  created_at   DateTime @default(now()) @db.Timestamp()
+
+  ticket    tickets    @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+  passenger passengers @relation(fields: [passenger_id], references: [id], onDelete: Cascade)
+
+  @@id([ticket_id, passenger_id])
+}
+
+model customer_payments {
+  id             BigInt            @id @default(autoincrement()) @db.BigInt
+  booking_id     BigInt            @db.BigInt
+  customer_id    BigInt            @db.BigInt
+  amount         Decimal           @db.Decimal(15, 2)
+  currency       String            @default("EGP") @db.VarChar(3)
+  payment_method payment_method_enum
+  payment_date   DateTime          @default(now()) @db.Timestamp()
+  status         payment_status_enum @default(paid)
+  notes          String?           @db.Text
+  created_at     DateTime          @default(now()) @db.Timestamp()
+
+  booking  bookings  @relation(fields: [booking_id], references: [id])
+  customer customers @relation(fields: [customer_id], references: [id])
+}
+
+model execution_payments {
+  id                   BigInt   @id @default(autoincrement()) @db.BigInt
+  booking_id           BigInt   @db.BigInt
+  execution_company_id BigInt   @db.BigInt
+  amount               Decimal  @db.Decimal(15, 2)
+  currency             String   @default("EGP") @db.VarChar(3)
+  payment_date         DateTime @default(now()) @db.Timestamp()
+  status               payment_status_enum @default(paid)
+  notes                String?  @db.Text
+  created_at           DateTime @default(now()) @db.Timestamp()
+
+  booking           bookings           @relation(fields: [booking_id], references: [id])
+  execution_company execution_companies @relation(fields: [execution_company_id], references: [id])
+}
+
+model refunds {
+  id                BigInt            @id @default(autoincrement()) @db.BigInt
+  ticket_id         BigInt            @db.BigInt
+  expected_amount   Decimal           @db.Decimal(15, 2)
+  actual_amount     Decimal?          @db.Decimal(15, 2)
+  refund_fee        Decimal?          @db.Decimal(15, 2)
+  currency          String            @default("EGP") @db.VarChar(3)
+  responsible_party responsible_party_enum
+  status            refund_status_enum @default(pending)
+  refund_date       DateTime?         @db.Timestamp()
+  notes             String?           @db.Text
+
+  ticket tickets @relation(fields: [ticket_id], references: [id])
+}
+
+model modifications {
+  id                BigInt   @id @default(autoincrement()) @db.BigInt
+  ticket_id         BigInt   @db.BigInt
+  old_data          Json?
+  new_data          Json?
+  fee               Decimal? @db.Decimal(15, 2)
+  currency          String   @default("EGP") @db.VarChar(3)
+  paid_by           responsible_party_enum?
+  modification_date DateTime @default(now()) @db.Timestamp()
+  notes             String?  @db.Text
+
+  ticket tickets @relation(fields: [ticket_id], references: [id])
+}
+
+model documents {
+  id            BigInt   @id @default(autoincrement()) @db.BigInt
+  customer_id   BigInt?  @db.BigInt
+  passenger_id  BigInt?  @db.BigInt
+  booking_id    BigInt?  @db.BigInt
+  document_type String   @db.VarChar(100)
+  file_url      String   @db.VarChar(500)
+  uploaded_at   DateTime @default(now()) @db.Timestamp()
+  notes         String?  @db.Text
+
+  customer  customers?  @relation(fields: [customer_id], references: [id])
+  passenger passengers? @relation(fields: [passenger_id], references: [id])
+  booking   bookings?   @relation(fields: [booking_id], references: [id])
+
+  @@index([customer_id])
+  @@index([passenger_id])
+  @@index([booking_id])
+}
+
+model alerts {
+  id                   BigInt             @id @default(autoincrement()) @db.BigInt
+  booking_id           BigInt?            @db.BigInt
+  ticket_id            BigInt?            @db.BigInt
+  customer_id          BigInt?            @db.BigInt
+  execution_company_id BigInt?            @db.BigInt
+  type                 alert_type_enum
+  severity             alert_severity_enum @default(info)
+  due_date             DateTime?          @db.Timestamp()
+  status               alert_status_enum  @default(open)
+  message              String             @db.Text
+  created_at           DateTime           @default(now()) @db.Timestamp()
+  read_at              DateTime?          @db.Timestamp()
+
+  booking           bookings?           @relation(fields: [booking_id], references: [id])
+  ticket            tickets?            @relation(fields: [ticket_id], references: [id])
+  customer          customers?          @relation(fields: [customer_id], references: [id])
+  execution_company execution_companies? @relation(fields: [execution_company_id], references: [id])
+}
+
+model activity_logs {
+  id          BigInt   @id @default(autoincrement()) @db.BigInt
+  user_id     BigInt   @db.BigInt
+  entity_type String   @db.VarChar(50)
+  entity_id   BigInt   @db.BigInt
+  action      String   @db.VarChar(100)
+  old_data    Json?
+  new_data    Json?
+  created_at  DateTime @default(now()) @db.Timestamp()
+
+  user users @relation(fields: [user_id], references: [id])
+}
