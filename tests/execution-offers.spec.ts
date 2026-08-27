@@ -55,6 +55,38 @@ test.describe("Execution Offers List", () => {
     const filteredCount = await page.locator("tbody tr").count();
     expect(filteredCount).toBeLessThanOrEqual(initialCount);
   });
+
+  test("select offer requires confirmation dialog before acting", async ({ page }) => {
+    const selectButtons = page.locator("button[title='اختيار العرض']");
+    if ((await selectButtons.count()) === 0) {
+      test.skip();
+      return;
+    }
+    await selectButtons.first().click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("تأكيد اختيار العرض")).toBeVisible();
+
+    await dialog.getByRole("button", { name: /إلغاء/ }).click();
+    await expect(dialog).toBeHidden();
+  });
+
+  test("reject offer requires confirmation dialog before acting", async ({ page }) => {
+    const rejectButtons = page.locator("button[title='رفض العرض']");
+    if ((await rejectButtons.count()) === 0) {
+      test.skip();
+      return;
+    }
+    await rejectButtons.first().click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("تأكيد رفض العرض")).toBeVisible();
+
+    await dialog.getByRole("button", { name: /إلغاء/ }).click();
+    await expect(dialog).toBeHidden();
+  });
 });
 
 test.describe("New Execution Offer Form", () => {

@@ -27,6 +27,14 @@ import { rejectOffer, selectOffer } from "./actions";
 import Link from "next/link";
 import { Plus, Search, Filter, CheckCircle, XCircle } from "lucide-react";
 import { offer_status_enum } from "@prisma/client";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Offer {
   id: string;
@@ -97,6 +105,10 @@ export function ExecutionOffersClient({ offers }: { offers: Offer[] }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [requestFilter, setRequestFilter] = useState("all");
   const [isPending, startTransition] = useTransition();
+  const [confirmTarget, setConfirmTarget] = useState<{
+    offer: Offer;
+    action: "select" | "reject";
+  } | null>(null);
 
   const requests = Array.from(
     new Map(
@@ -127,17 +139,29 @@ export function ExecutionOffersClient({ offers }: { offers: Offer[] }) {
     return matchesSearch && matchesStatus && matchesRequest;
   });
 
-  function handleReject(id: string) {
+  function handleReject(offer: Offer) {
+    setConfirmTarget({ offer, action: "reject" });
+  }
+
+  function handleSelect(offer: Offer) {
+    setConfirmTarget({ offer, action: "select" });
+  }
+
+  function handleConfirm() {
+    if (!confirmTarget) return;
+    const { offer, action } = confirmTarget;
+    const run =
+      action === "select"
+        ? () => selectOffer(offer.id)
+        : () => rejectOffer(offer.id);
     startTransition(async () => {
-      await rejectOffer(id);
+      await run();
+      setConfirmTarget(null);
     });
   }
 
-  function handleSelect(id: string) {
-    startTransition(async () => {
-      await selectOffer(id);
-    });
-  }
+  const confirmOffer = confirmTarget?.offer;
+  const isSelect = confirmTarget?.action === "select";
 
   return (
     <div className="space-y-6">
@@ -282,7 +306,7 @@ export function ExecutionOffersClient({ offers }: { offers: Offer[] }) {
                                 size="icon"
                                 className="text-green-600 hover:text-green-700"
                                 disabled={isPending}
-                                onClick={() => handleSelect(offer.id)}
+                                onClick={() => handleSelect(offer)}
                                 title="اختيار العرض"
                               >
                                 <CheckCircle className="h-4 w-4" />
@@ -292,7 +316,7 @@ export function ExecutionOffersClient({ offers }: { offers: Offer[] }) {
                                 size="icon"
                                 className="text-destructive hover:text-destructive"
                                 disabled={isPending}
-                                onClick={() => handleReject(offer.id)}
+                                onClick={() => handleReject(offer)}
                                 title="رفض العرض"
                               >
                                 <XCircle className="h-4 w-4" />
@@ -309,6 +333,70 @@ export function ExecutionOffersClient({ offers }: { offers: Offer[] }) {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog
+        open={confirmTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {isSelect ? "تأكيد اختيار العرض" : "تأكيد رفض العرض"}
+            </DialogTitle>
+            <DialogDescription>
+              {isSelect
+                ? "سيتم إنشاء حجز من هذا العرض بسعر التنفيذ التالي، ورفض جميع العروض المنافسة الأخرى. هذا الإجراء نهائي."
+                : "سيتم رفض هذا العرض ولن يُستخدم لحجز الرحلة. هذا الإجراء نهائي."}
+            </DialogDescription>
+          </DialogHeader>
+          {confirmOffer && (
+            <div className="space-y-2 rounded-lg border bg-muted/40 p-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">العميل</span>
+                <span className="font-medium">
+                  {confirmOffer.request.customer.name}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">الرحلة</span>
+                <span className="font-medium">
+                  {confirmOffer.request.origin} → {confirmOffer.request.destination}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">شركة التنفيذ</span>
+                <span className="font-medium">
+                  {confirmOffer.execution_company.name}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">التكلفة</span>
+                <span className="font-medium">
+                  <EGPAmount amount={confirmOffer.execution_cost} />
+                </span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmTarget(null)}
+              disabled={isPending}
+            >
+              إلغاء
+            </Button>
+            <Button
+              variant={isSelect ? "default" : "destructive"}
+              onClick={handleConfirm}
+              disabled={isPending}
+            >
+              {isSelect ? "تأكيد الاختيار" : "تأكيد الرفض"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
