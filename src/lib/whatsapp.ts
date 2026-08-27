@@ -87,7 +87,14 @@ export function buildBookingRequestMessage(booking: WhatsAppSource): string {
   lines.push("- صلاحية العرض");
   lines.push("- شروط الدفع");
   lines.push("");
-  if (customerName) lines.push(`العميل: ${customerName}`);
+  if (customerName) {
+    const customerPhone = booking.customer?.phone?.trim();
+    lines.push(
+      customerPhone
+        ? `العميل: ${customerName} (${customerPhone})`
+        : `العميل: ${customerName}`
+    );
+  }
   lines.push(`مرجع الحجز: ${reference}`);
   lines.push("");
   lines.push("شكرًا لتعاونكم.");
@@ -99,4 +106,10 @@ export function buildWhatsAppLink(phone: string | null | undefined, text: string
   const normalized = formatPhoneForWhatsApp(phone);
   if (!normalized) return "";
   return `https://wa.me/${normalized}?text=${encodeURIComponent(text)}`;
+}
+
+// Opens WhatsApp and lets the employee choose the contact (no phone required),
+// as used when sending a request without targeting a specific company.
+export function buildWhatsAppShareLink(text: string): string {
+  return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }

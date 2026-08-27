@@ -136,7 +136,7 @@ export function QuickActions({
 
       {/* New booking modal */}
       <Dialog open={open === "new-booking"} onOpenChange={(o) => { if (!o) { setOpen(null); resetBookingForm(); } }}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-h-[90vh] w-full max-w-lg overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>حجز جديد</DialogTitle>
             <DialogDescription>

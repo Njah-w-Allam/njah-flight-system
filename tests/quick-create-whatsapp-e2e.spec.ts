@@ -31,13 +31,14 @@ test.describe("Quick Booking Create → WhatsApp", () => {
 
     await page.getByRole("button", { name: "إنشاء الحجز" }).click();
 
-    // WhatsApp dialog should appear with the entered data
+    // WhatsApp dialog should appear with the entered data, including customer name
     await expect(page.getByRole("heading", { name: /أرسل الطلب عبر واتساب/ })).toBeVisible();
     const textarea = page.locator("textarea");
     const text = await textarea.inputValue();
     expect(text).toContain("القاهرة");
     expect(text).toContain("الملك عبد العزيز");
     expect(text).toContain("2");
+    expect(text).toContain("العميل:");
 
     // Optional flexible-dates checkbox exists and works
     const flexible = page.locator("label", { hasText: "ممكن تشوف يوم قبل او يوم بعد ارخص سعر" }).locator("input[type=checkbox]");
@@ -46,13 +47,37 @@ test.describe("Quick Booking Create → WhatsApp", () => {
     const withFlexible = await textarea.inputValue();
     expect(withFlexible).toContain("ممكن تشوف يوم قبل او يوم بعد ارخص سعر");
 
-    // Multi-select: at least one company is defaulted; select a second one
+    // Multi-select: select a second company
     const companyLabels = page.locator("label", { has: page.locator("input[type=checkbox]") }).filter({ hasNotText: "ممكن تشوف" });
     const secondCompany = companyLabels.nth(1).locator("input[type=checkbox]");
     await secondCompany.check();
     await expect(page.getByRole("button", { name: /إرسال عبر واتساب \(2 شركات\)/ })).toBeVisible();
 
+    // Sending without any company is allowed: pick a contact inside WhatsApp
+    const allCompanyChecks = page.locator("label", { has: page.locator("input[type=checkbox]") }).filter({ hasNotText: "ممكن تشوف" }).locator("input[type=checkbox]");
+    for (let i = 0; i < await allCompanyChecks.count(); i++) {
+      if (await allCompanyChecks.nth(i).isChecked()) await allCompanyChecks.nth(i).uncheck();
+    }
+    await expect(page.getByRole("button", { name: /إرسال عبر واتساب \(اختر جهة الاتصال\)/ })).toBeVisible();
+
     // Resume button is available
     await expect(page.getByRole("button", { name: /متابعة إلى مرحلة العرض/ })).toBeVisible();
+  });
+});
+
+test.describe("Quick Booking dialogs are responsive", () => {
+  test.use({ viewport: { width: 375, height: 700 } });
+
+  test("booking modal is scrollable on a small screen", async ({ page }) => {
+    await page.goto("/dashboard");
+    await page.waitForLoadState("networkidle");
+    await page.locator("button").filter({ hasText: "+ حجز جديد" }).click();
+    await expect(page.getByRole("heading", { name: "حجز جديد" })).toBeVisible();
+    const dialog = page.locator('[data-slot="dialog-content"]');
+    await expect(dialog).toBeVisible();
+    // The dialog must be bounded by the viewport height and scrollable
+    const box = await dialog.boundingBox();
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(700 + 1);
   });
 });

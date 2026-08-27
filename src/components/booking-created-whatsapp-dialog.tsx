@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import {
   buildBookingRequestMessage,
   buildWhatsAppLink,
+  buildWhatsAppShareLink,
   type WhatsAppSource,
 } from "@/lib/whatsapp";
 import { MessageCircle, Copy, ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
@@ -75,10 +76,15 @@ export function BookingWhatsAppDialog({
   const sendable = companies.filter(
     (c) => selectedIds.includes(String(c.id)) && c.phone
   );
-  const canSend = sendable.length > 0;
 
   function sendToWhatsApp() {
-    // Open a WhatsApp tab for each selected target company.
+    // If any companies with a phone are selected, open WhatsApp for each one.
+    // Otherwise open a WhatsApp share so the employee picks the contact inside
+    // WhatsApp (no execution company required).
+    if (sendable.length === 0) {
+      window.open(buildWhatsAppShareLink(message), "_blank", "noopener,noreferrer");
+      return;
+    }
     sendable.forEach((c, i) => {
       const link = buildWhatsAppLink(c.phone, message);
       if (!link) return;
@@ -107,23 +113,23 @@ export function BookingWhatsAppDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] w-full max-w-lg overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageCircle className="h-5 w-5 text-green-600" />
             أرسل الطلب عبر واتساب
           </DialogTitle>
           <DialogDescription>
-            تم إنشاء الطلب بنجاح. الرسالة معبأة ببيانات الحجز الذي أدخلته. عند إرسالها عبر واتساب، يبقى كل شيء متوقفًا حتى تعود وتتابع يدويًا.
+            تم إنشاء الطلب بنجاح. الرسالة معبأة ببيانات الحجز (العميل واسمه ورقمه). أرسلها مباشرة لشركة تنفيذ أو بدون تحديد شركة لاختيار جهة الاتصال من داخل واتساب. يبقى كل شيء متوقفًا حتى تعود وتتابع يدويًا.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>شركات التنفيذ (اختر واحدة أو أكثر للإرسال)</Label>
+            <Label>شركات التنفيذ (اختياري — اختر واحدة أو أكثر)</Label>
             <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border p-2">
               {companies.length === 0 ? (
-                <p className="px-1 py-2 text-sm text-muted-foreground">لا توجد شركات تنفيذ مسجلة.</p>
+                <p className="px-1 py-2 text-sm text-muted-foreground">لا توجد شركات تنفيذ مسجلة — يمكنك الإرسال مباشرة واختيار جهة الاتصال من داخل واتساب.</p>
               ) : (
                 companies.map((c) => {
                   const checked = selectedIds.includes(String(c.id));
@@ -178,26 +184,26 @@ export function BookingWhatsAppDialog({
           />
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button variant="outline" onClick={copyMessage}>
+            <Button type="button" variant="outline" onClick={copyMessage}>
               <Copy className="ml-2 h-4 w-4" />
               نسخ الرسالة
             </Button>
-            {canSend ? (
-              <Button onClick={sendToWhatsApp} className="bg-green-600 hover:bg-green-700 w-full">
-                <MessageCircle className="ml-2 h-4 w-4" />
-                إرسال عبر واتساب
-                {sendable.length > 1 ? ` (${sendable.length} شركات)` : ""}
-              </Button>
-            ) : (
-              <Button disabled className="w-full">
-                <MessageCircle className="ml-2 h-4 w-4" />
-                اختر شركة برقم هاتف
-              </Button>
-            )}
+            <Button
+              type="button"
+              onClick={sendToWhatsApp}
+              className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
+            >
+              <MessageCircle className="ml-2 h-4 w-4" />
+              {sendable.length === 0
+                ? "إرسال عبر واتساب (اختر جهة الاتصال)"
+                : sendable.length > 1
+                  ? `إرسال عبر واتساب (${sendable.length} شركات)`
+                  : "إرسال عبر واتساب"}
+            </Button>
           </div>
-          <Button variant="default" onClick={continueToOffers} disabled={navigating}>
+          <Button variant="default" onClick={continueToOffers} disabled={navigating} className="w-full sm:w-auto">
             {navigating ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <ArrowLeft className="ml-2 h-4 w-4" />}
             متابعة إلى مرحلة العرض
           </Button>
