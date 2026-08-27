@@ -6,14 +6,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   buildBookingRequestMessage,
   buildWhatsAppLink,
   type WhatsAppSource,
 } from "@/lib/whatsapp";
-import { MessageCircle, Copy, ArrowLeft, Loader2 } from "lucide-react";
+import { MessageCircle, Copy, ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type Company = { id: bigint; name: string; phone?: string | null };
 
@@ -33,12 +33,18 @@ export function BookingWhatsAppDialog({
   companies: Company[];
 }) {
   const router = useRouter();
-  const [companyId, setCompanyId] = useState<string>("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [navigating, setNavigating] = useState(false);
   const [flexibleDates, setFlexibleDates] = useState(false);
 
   const initial = useMemo(() => buildBookingRequestMessage(requestSource), [requestSource]);
   const [message, setMessage] = useState(initial);
+
+  // Default to the first company that has a phone number when the dialog opens.
+  const defaultIds = useMemo(() => {
+    const withPhone = companies.find((c) => c.phone);
+    return withPhone ? [String(withPhone.id)] : [];
+  }, [companies]);
 
   // Keep the editable message in sync when a new booking request is created.
   const [lastSynced, setLastSynced] = useState<string>("");
@@ -47,6 +53,7 @@ export function BookingWhatsAppDialog({
     setMessage(initial);
     setFlexibleDates(false);
     setLastSynced(syncKey);
+    setSelectedIds(defaultIds);
   }
 
   function toggleFlexible(on: boolean) {
@@ -59,12 +66,30 @@ export function BookingWhatsAppDialog({
     });
   }
 
-  const company = companies.find((c) => String(c.id) === companyId);
-  const targetPhone = company?.phone ?? null;
-  const targetLabel = company ? `شركة ${company.name}` : "شركة التنفيذ";
+  function toggleCompany(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
 
-  const waLink = buildWhatsAppLink(targetPhone, message);
-  const canSend = waLink.length > 0;
+  const sendable = companies.filter(
+    (c) => selectedIds.includes(String(c.id)) && c.phone
+  );
+  const canSend = sendable.length > 0;
+
+  function sendToWhatsApp() {
+    // Open a WhatsApp tab for each selected target company.
+    sendable.forEach((c, i) => {
+      const link = buildWhatsAppLink(c.phone, message);
+      if (!link) return;
+      setTimeout(() => window.open(link, "_blank", "noopener,noreferrer"), i * 150);
+    });
+    if (sendable.length > 1) {
+      toast.success(`تم فتح واتساب لـ ${sendable.length} شركات`);
+    } else {
+      toast.success("تم فتح واتساب");
+    }
+  }
 
   async function copyMessage() {
     try {
@@ -95,17 +120,43 @@ export function BookingWhatsAppDialog({
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>شركة التنفيذ المستهدفة</Label>
-            <Select value={companyId} onValueChange={(v) => setCompanyId(v ?? "")}>
-              <SelectTrigger><SelectValue placeholder="اختر شركة التنفيذ..." /></SelectTrigger>
-              <SelectContent>
-                {companies.map((c) => (
-                  <SelectItem key={String(c.id)} value={String(c.id)}>
-                    {c.name}{c.phone ? ` - ${c.phone}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>شركات التنفيذ (اختر واحدة أو أكثر للإرسال)</Label>
+            <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border p-2">
+              {companies.length === 0 ? (
+                <p className="px-1 py-2 text-sm text-muted-foreground">لا توجد شركات تنفيذ مسجلة.</p>
+              ) : (
+                companies.map((c) => {
+                  const checked = selectedIds.includes(String(c.id));
+                  return (
+                    <label
+                      key={String(c.id)}
+                      className={cn(
+                        "flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                        checked ? "bg-primary/10" : "hover:bg-muted"
+                      )}
+                    >
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleCompany(String(c.id))}
+                          className="h-4 w-4 shrink-0 accent-primary"
+                        />
+                        <span className="font-medium">{c.name}</span>
+                      </span>
+                      <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {c.phone ? (
+                          c.phone
+                        ) : (
+                          <span className="text-destructive">بدون رقم</span>
+                        )}
+                        {checked && <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                      </span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
           </div>
 
           <label className="flex cursor-pointer items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
@@ -134,16 +185,15 @@ export function BookingWhatsAppDialog({
               نسخ الرسالة
             </Button>
             {canSend ? (
-              <a href={waLink} target="_blank" rel="noopener noreferrer" className="inline-flex">
-                <Button className="bg-green-600 hover:bg-green-700 w-full">
-                  <MessageCircle className="ml-2 h-4 w-4" />
-                  إرسال عبر واتساب
-                </Button>
-              </a>
+              <Button onClick={sendToWhatsApp} className="bg-green-600 hover:bg-green-700 w-full">
+                <MessageCircle className="ml-2 h-4 w-4" />
+                إرسال عبر واتساب
+                {sendable.length > 1 ? ` (${sendable.length} شركات)` : ""}
+              </Button>
             ) : (
               <Button disabled className="w-full">
                 <MessageCircle className="ml-2 h-4 w-4" />
-                لا يوجد رقم للشركة
+                اختر شركة برقم هاتف
               </Button>
             )}
           </div>

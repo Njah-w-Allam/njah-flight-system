@@ -40,11 +40,17 @@ test.describe("Quick Booking Create → WhatsApp", () => {
     expect(text).toContain("2");
 
     // Optional flexible-dates checkbox exists and works
-    const flexible = page.locator("input[type=checkbox]");
+    const flexible = page.locator("label", { hasText: "ممكن تشوف يوم قبل او يوم بعد ارخص سعر" }).locator("input[type=checkbox]");
     await expect(flexible).toBeVisible();
     await flexible.check();
     const withFlexible = await textarea.inputValue();
     expect(withFlexible).toContain("ممكن تشوف يوم قبل او يوم بعد ارخص سعر");
+
+    // Multi-select: at least one company is defaulted; select a second one
+    const companyLabels = page.locator("label", { has: page.locator("input[type=checkbox]") }).filter({ hasNotText: "ممكن تشوف" });
+    const secondCompany = companyLabels.nth(1).locator("input[type=checkbox]");
+    await secondCompany.check();
+    await expect(page.getByRole("button", { name: /إرسال عبر واتساب \(2 شركات\)/ })).toBeVisible();
 
     // Resume button is available
     await expect(page.getByRole("button", { name: /متابعة إلى مرحلة العرض/ })).toBeVisible();
