@@ -127,6 +127,10 @@ export function TicketsClient({
   const [selectedAirline, setSelectedAirline] = useState<string>("");
   const [passengerList, setPassengerList] = useState<PassengerOption[]>([]);
   const [selectedPassengers, setSelectedPassengers] = useState<string[]>([]);
+  const [ticketAction, setTicketAction] = useState<{
+    ticket: any;
+    action: "issue" | "cancel";
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const filtered = tickets.filter(
@@ -201,32 +205,37 @@ export function TicketsClient({
   }
 
   function handleIssue(id: bigint) {
-    if (!confirm("هل أنت متأكد من إصدار هذه التذكرة؟")) return;
-    startTransition(async () => {
-      try {
-        await issueTicket(id);
-        toast.success("تم الإصدار", {
-          description: "تم إصدار التذكرة بنجاح",
-        });
-      } catch (e: any) {
-        toast.error("خطأ", {
-          description: e.message || "حدث خطأ أثناء الإصدار",
-        });
-      }
-    });
+    const ticket = tickets.find((t) => t.id === id);
+    if (!ticket) return;
+    setTicketAction({ ticket, action: "issue" });
   }
 
   function handleCancel(id: bigint) {
-    if (!confirm("هل أنت متأكد من إلغاء هذه التذكرة؟")) return;
+    const ticket = tickets.find((t) => t.id === id);
+    if (!ticket) return;
+    setTicketAction({ ticket, action: "cancel" });
+  }
+
+  function handleTicketConfirm() {
+    if (!ticketAction) return;
+    const { ticket, action } = ticketAction;
     startTransition(async () => {
       try {
-        await cancelTicket(id);
-        toast.success("تم الإلغاء", {
-          description: "تم إلغاء التذكرة بنجاح",
-        });
+        if (action === "issue") {
+          await issueTicket(ticket.id);
+          toast.success("تم الإصدار", {
+            description: "تم إصدار التذكرة بنجاح",
+          });
+        } else {
+          await cancelTicket(ticket.id);
+          toast.success("تم الإلغاء", {
+            description: "تم إلغاء التذكرة بنجاح",
+          });
+        }
+        setTicketAction(null);
       } catch (e: any) {
         toast.error("خطأ", {
-          description: e.message || "حدث خطأ أثناء الإلغاء",
+          description: e.message || "حدث خطأ",
         });
       }
     });
@@ -486,6 +495,56 @@ export function TicketsClient({
           </div>
         </CardContent>
       </Card>
+
+      <Dialog
+        open={ticketAction !== null}
+        onOpenChange={(open) => {
+          if (!open) setTicketAction(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {ticketAction?.action === "issue" ? "تأكيد إصدار التذكرة" : "تأكيد إلغاء التذكرة"}
+            </DialogTitle>
+            <DialogDescription>
+              {ticketAction?.action === "issue"
+                ? "سيتم إصدار التذكرة رسمياً وتحديد تاريخ الإصدار. لا يمكن التراجع عن هذا الإجراء."
+                : "سيتم إلغاء التذكرة نهائياً. لا يمكن التراجع عن هذا الإجراء."}
+            </DialogDescription>
+          </DialogHeader>
+          {ticketAction?.ticket && (
+            <div className="space-y-2 rounded-lg border bg-muted/40 p-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">رقم التذكرة</span>
+                <span className="font-medium">{ticketAction.ticket.ticket_number || "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">الناقل</span>
+                <span className="font-medium">{ticketAction.ticket.airline.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">السعر</span>
+                <span className="font-medium">
+                  <EGPAmount amount={ticketAction.ticket.ticket_price} />
+                </span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTicketAction(null)} disabled={isPending}>
+              إلغاء
+            </Button>
+            <Button
+              variant={ticketAction?.action === "issue" ? "default" : "destructive"}
+              onClick={handleTicketConfirm}
+              disabled={isPending}
+            >
+              {ticketAction?.action === "issue" ? "تأكيد الإصدار" : "تأكيد الإلغاء"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
