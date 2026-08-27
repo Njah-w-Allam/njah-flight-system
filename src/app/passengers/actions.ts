@@ -41,4 +41,33 @@ export async function deletePassenger(id: bigint) {
   });
 
   revalidatePath("/passengers");
+  revalidatePath("/bookings");
+}
+
+export async function updatePassenger(id: bigint, formData: FormData) {
+  const name = formData.get("name") as string;
+  const passportNumber = (formData.get("passport_number") as string) || null;
+  const nationality = (formData.get("nationality") as string) || null;
+  const dateOfBirthRaw = formData.get("date_of_birth") as string | null;
+  const notes = (formData.get("notes") as string) || null;
+
+  if (!name || name.trim().length === 0) {
+    throw new Error("اسم المسافر مطلوب");
+  }
+
+  const dateOfBirth = dateOfBirthRaw ? new Date(dateOfBirthRaw) : null;
+
+  await prisma.passengers.update({
+    where: { id },
+    data: {
+      name: name.trim(),
+      passport_number: passportNumber?.trim() || null,
+      nationality: nationality?.trim() || null,
+      date_of_birth: dateOfBirth,
+      notes: notes?.trim() || null,
+    },
+  });
+
+  revalidatePath("/passengers");
+  revalidatePath("/bookings");
 }

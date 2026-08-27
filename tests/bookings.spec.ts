@@ -128,4 +128,56 @@ test.describe("Booking Detail Page", () => {
       await expect(page.getByText("البيانات المالية").first()).toBeVisible();
     }
   });
+
+  test("booking detail passengers tab allows adding a passenger from within the booking", async ({ page }) => {
+    await page.goto("/bookings");
+    await page.waitForLoadState("networkidle");
+
+    const detailLink = page.locator('a[href^="/bookings/"]').first();
+    if (!(await detailLink.isVisible())) {
+      test.skip();
+      return;
+    }
+    await detailLink.click();
+    await page.waitForURL("**/bookings/**");
+
+    await page.getByRole("tab", { name: /المسافرين/ }).click();
+    const addBtn = page.getByRole("button", { name: /إضافة مسافر/ });
+    await expect(addBtn).toBeVisible();
+    await addBtn.click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("إضافة مسافر جديد")).toBeVisible();
+    await dialog.getByRole("button", { name: /إلغاء/ }).click();
+    await expect(dialog).toBeHidden();
+  });
+
+  test("booking detail tickets tab shows manage actions", async ({ page }) => {
+    await page.goto("/bookings");
+    await page.waitForLoadState("networkidle");
+
+    const detailLink = page.locator('a[href^="/bookings/"]').first();
+    if (!(await detailLink.isVisible())) {
+      test.skip();
+      return;
+    }
+    await detailLink.click();
+    await page.waitForURL("**/bookings/**");
+
+    await page.getByRole("tab", { name: /التذاكر/ }).click();
+    const issueBtn = page.locator("button[title='إصدار التذكرة']").first();
+    const cancelBtn = page.locator("button[title='إلغاء التذكرة']").first();
+    if ((await issueBtn.count()) === 0 && (await cancelBtn.count()) === 0) {
+      return;
+    }
+    if ((await issueBtn.count()) > 0) {
+      await issueBtn.click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByText("تأكيد إصدار التذكرة")).toBeVisible();
+      await dialog.getByRole("button", { name: /إلغاء/ }).click();
+      await expect(dialog).toBeHidden();
+    }
+  });
 });

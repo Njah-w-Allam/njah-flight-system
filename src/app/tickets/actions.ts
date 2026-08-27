@@ -55,6 +55,7 @@ export async function issueTicket(id: bigint) {
   });
 
   revalidatePath("/tickets");
+  revalidatePath("/bookings");
 }
 
 export async function cancelTicket(id: bigint) {
@@ -66,6 +67,7 @@ export async function cancelTicket(id: bigint) {
   });
 
   revalidatePath("/tickets");
+  revalidatePath("/bookings");
 }
 
 export async function linkPassengerToTicket(
