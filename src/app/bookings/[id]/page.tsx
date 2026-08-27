@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { serializeDecimal } from "@/lib/serialize";
 import { notFound } from "next/navigation";
 import { BookingDetailClient } from "./booking-detail-client";
 
@@ -51,5 +52,5 @@ export default async function BookingDetailPage({
     notFound();
   }
 
-  return <BookingDetailClient booking={booking} />;
+  return <BookingDetailClient booking={serializeDecimal(booking)} />;
 }

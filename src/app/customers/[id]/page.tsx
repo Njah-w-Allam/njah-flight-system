@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { serializeDecimal } from "@/lib/serialize";
 import { notFound } from "next/navigation";
 import { CustomerDetailClient } from "./customer-detail-client";
 
@@ -47,5 +48,5 @@ export default async function CustomerDetailPage({
     notFound();
   }
 
-  return <CustomerDetailClient customer={customer} />;
+  return <CustomerDetailClient customer={serializeDecimal(customer)} />;
 }

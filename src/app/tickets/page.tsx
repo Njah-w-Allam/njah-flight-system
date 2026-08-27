@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { serializeDecimal } from "@/lib/serialize";
 import { TicketsClient } from "./tickets-client";
 
 export const dynamic = "force-dynamic";
@@ -41,9 +42,9 @@ export default async function TicketsPage() {
 
   return (
     <TicketsClient
-      tickets={tickets}
-      airlines={airlines}
-      bookings={bookings}
+      tickets={serializeDecimal(tickets)}
+      airlines={serializeDecimal(airlines)}
+      bookings={serializeDecimal(bookings)}
     />
   );
 }

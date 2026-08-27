@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { serializeDecimal } from "@/lib/serialize";
 import { DashboardClient } from "./dashboard-client";
 
 export const dynamic = "force-dynamic";
@@ -92,14 +93,14 @@ export default async function DashboardPage() {
 
   return (
     <DashboardClient
-      todayBookings={todayBookings}
-      newBookings={newBookings}
-      upcomingTickets={upcomingTickets as any[]}
-      ticketingDeadlines={ticketingDeadlines}
-      customersInDebt={customersInDebt}
-      overduePayments={overduePayments}
-      executionDue={executionDue}
-      openAlerts={openAlerts}
+      todayBookings={serializeDecimal(todayBookings)}
+      newBookings={serializeDecimal(newBookings)}
+      upcomingTickets={serializeDecimal(upcomingTickets as any[])}
+      ticketingDeadlines={serializeDecimal(ticketingDeadlines)}
+      customersInDebt={serializeDecimal(customersInDebt)}
+      overduePayments={serializeDecimal(overduePayments)}
+      executionDue={serializeDecimal(executionDue)}
+      openAlerts={serializeDecimal(openAlerts)}
     />
   );
 }

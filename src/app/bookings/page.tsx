@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { serializeDecimal } from "@/lib/serialize";
 import { BookingsClient } from "./bookings-client";
 
 export const dynamic = "force-dynamic";
@@ -19,5 +20,5 @@ export default async function BookingsPage() {
     orderBy: { created_at: "desc" },
   });
 
-  return <BookingsClient bookings={bookings} />;
+  return <BookingsClient bookings={serializeDecimal(bookings)} />;
 }

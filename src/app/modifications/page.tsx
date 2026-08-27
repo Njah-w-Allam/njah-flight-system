@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { serializeDecimal } from "@/lib/serialize";
 import { ModificationsClient } from "./modifications-client";
 
 export const dynamic = "force-dynamic";
@@ -44,9 +45,9 @@ export default async function ModificationsPage() {
 
   return (
     <ModificationsClient
-      modifications={modifications}
-      refunds={refunds}
-      tickets={tickets}
+      modifications={serializeDecimal(modifications)}
+      refunds={serializeDecimal(refunds)}
+      tickets={serializeDecimal(tickets)}
     />
   );
 }

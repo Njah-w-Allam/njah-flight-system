@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { serializeDecimal } from "@/lib/serialize";
 import { ExecutionCompaniesClient } from "./execution-companies-client";
 
 export const dynamic = "force-dynamic";
@@ -17,5 +18,5 @@ export default async function ExecutionCompaniesPage() {
     orderBy: { created_at: "desc" },
   });
 
-  return <ExecutionCompaniesClient companies={companies} />;
+  return <ExecutionCompaniesClient companies={serializeDecimal(companies)} />;
 }

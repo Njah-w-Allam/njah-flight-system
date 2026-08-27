@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { serializeDecimal } from "@/lib/serialize";
 import { CustomerPaymentsClient } from "./customer-payments-client";
 
 export const dynamic = "force-dynamic";
@@ -19,5 +20,5 @@ export default async function CustomerPaymentsPage() {
     orderBy: { created_at: "desc" },
   });
 
-  return <CustomerPaymentsClient payments={payments} bookings={bookings} />;
+  return <CustomerPaymentsClient payments={serializeDecimal(payments)} bookings={serializeDecimal(bookings)} />;
 }
