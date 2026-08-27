@@ -14,11 +14,14 @@ import {
   CalendarCheck,
   AlertTriangle,
   Ticket,
-  Users,
   Clock,
   ArrowLeft,
   Plane,
+  Wallet,
+  TrendingUp,
+  CheckCircle2,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface DashboardProps {
   todayBookings: any[];
@@ -56,6 +59,33 @@ function timeUntil(date: string | Date) {
   return `${minutes} دقيقة`;
 }
 
+function SectionHeader({
+  icon: Icon,
+  title,
+  action,
+  tone = "default",
+}: {
+  icon: typeof Ticket;
+  title: string;
+  action?: React.ReactNode;
+  tone?: "danger" | "default";
+}) {
+  return (
+    <CardHeader
+      className={cn(
+        "flex flex-row items-center justify-between",
+        tone === "danger" && "text-destructive"
+      )}
+    >
+      <CardTitle className="flex items-center gap-2">
+        <Icon className="h-5 w-5" />
+        {title}
+      </CardTitle>
+      {action}
+    </CardHeader>
+  );
+}
+
 export function DashboardClient({
   todayBookings,
   newBookings,
@@ -68,6 +98,15 @@ export function DashboardClient({
 }: DashboardProps) {
   const criticalAlerts = openAlerts.filter((a) => a.severity === "critical");
   const totalDebt = customersInDebt.reduce((sum, c) => sum + Number(c.balance), 0);
+  // Near-departure tickets are the top operational priority.
+  const criticalTickets = upcomingTickets.filter(
+    (t) => new Date(t.departure_at).getTime() - Date.now() <= 24 * 60 * 60 * 1000
+  );
+  const attentionCount =
+    criticalTickets.length + newBookings.length + overduePayments.length;
+  const totalOverdue =
+    overduePayments.reduce((s, p) => s + Number(p.amount), 0) +
+    executionDue.reduce((s, p) => s + Number(p.amount), 0);
 
   return (
     <div className="space-y-6">
@@ -81,6 +120,61 @@ export function DashboardClient({
             day: "numeric",
           })}
         </span>
+      </div>
+
+      {/* Command-center status strip */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <Card
+          className={cn(
+            "border-2",
+            attentionCount > 0
+              ? "border-amber-500/60 bg-amber-500/5"
+              : "border-emerald-500/60 bg-emerald-500/5"
+          )}
+        >
+          <CardContent className="flex items-center gap-3 p-4">
+            <div
+              className={cn(
+                "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white",
+                attentionCount > 0 ? "bg-amber-500" : "bg-emerald-600"
+              )}
+            >
+              {attentionCount > 0 ? (
+                <AlertTriangle className="h-5 w-5" />
+              ) : (
+                <CheckCircle2 className="h-5 w-5" />
+              )}
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">تحتاج متابعة الآن</div>
+              <div className="text-2xl font-bold">{attentionCount}</div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Plane className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">رحلات تُغادر خلال 24 ساعة</div>
+              <div className="text-2xl font-bold">{criticalTickets.length}</div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <Wallet className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">متأخرات جارية</div>
+              <div className="text-xl font-bold">
+                <EGPAmount amount={totalOverdue} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Stats Row */}
@@ -133,7 +227,7 @@ export function DashboardClient({
               {upcomingTickets.slice(0, 5).map((ticket: any) => (
                 <div
                   key={ticket.ticket_id}
-                  className="flex items-center justify-between rounded-lg border p-3"
+                  className="flex items-center justify-between rounded-lg border bg-background p-3"
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
@@ -167,8 +261,12 @@ export function DashboardClient({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* New Bookings */}
         <Card>
-          <CardHeader>
-            <CardTitle>الحجوزات الجديدة</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              الحجوزات الجديدة
+            </CardTitle>
+            <span className="text-xs text-muted-foreground">بانتظار التأكيد</span>
           </CardHeader>
           <CardContent>
             {newBookings.length === 0 ? (
@@ -197,11 +295,12 @@ export function DashboardClient({
 
         {/* Ticketing Deadlines */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
               مواعيد الإصدار القادمة
             </CardTitle>
+            <span className="text-xs text-muted-foreground">خلال 3 أيام</span>
           </CardHeader>
           <CardContent>
             {ticketingDeadlines.length === 0 ? (
@@ -237,7 +336,10 @@ export function DashboardClient({
         {/* Customers in Debt */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>العملاء المدينون</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Wallet className="h-5 w-5" />
+              العملاء المدينون
+            </CardTitle>
             <span className="text-sm text-muted-foreground">
               الإجمالي: <EGPAmount amount={totalDebt} />
             </span>
@@ -269,11 +371,12 @@ export function DashboardClient({
 
         {/* Open Alerts */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
               التنبيهات المفتوحة
             </CardTitle>
+            <Badge variant="outline">{openAlerts.length}</Badge>
           </CardHeader>
           <CardContent>
             {openAlerts.length === 0 ? (
@@ -310,13 +413,12 @@ export function DashboardClient({
 
         {/* Overdue Payments */}
         {(overduePayments.length > 0 || executionDue.length > 0) && (
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-destructive">
-                <AlertTriangle className="h-5 w-5" />
-                المدفوعات المتأخرة
-              </CardTitle>
-            </CardHeader>
+          <Card className="lg:col-span-2 border-destructive/40">
+            <SectionHeader
+              icon={AlertTriangle}
+              title="المدفوعات المتأخرة"
+              tone="danger"
+            />
             <CardContent>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {overduePayments.length > 0 && (

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TicketStatusBadge, BookingStatusBadge, EGPAmount } from "@/components/status-badges";
 import Link from "next/link";
-import { Plane, Clock, Phone, User, ArrowLeft } from "lucide-react";
+import { Plane, Clock, Phone, User, ArrowLeft, Wallet } from "lucide-react";
 
 interface Ticket {
   ticket_id: bigint;
@@ -30,6 +30,8 @@ interface Ticket {
   booking_status: string;
   current_selling_price: any;
   current_purchase_price: any;
+  issued_before_payment: boolean;
+  paid_amount: any;
 }
 
 function formatDateTime(date: Date | string) {
@@ -59,6 +61,26 @@ function getUrgencyLevel(date: Date | string): "critical" | "warning" | "normal"
   return "normal";
 }
 
+function paymentStatus(ticket: Ticket): {
+  label: string;
+  tone: "ok" | "due" | "missing";
+} {
+  const selling = Number(ticket.current_selling_price || 0);
+  const paid = Number(ticket.paid_amount || 0);
+  const remaining = Math.max(0, selling - paid);
+  if (remaining <= 0)
+    return { label: "مسدد بالكامل", tone: "ok" };
+  if (ticket.ticket_status === "issued")
+    return { label: `متبقي ${remaining.toLocaleString("ar-EG-u-nu-latn")} ج.م`, tone: "due" };
+  return { label: `المدفوع ${paid.toLocaleString("ar-EG-u-nu-latn")} من ${selling.toLocaleString("ar-EG-u-nu-latn")}`, tone: "due" };
+}
+
+const urgencyOrder: Record<"critical" | "warning" | "normal", number> = {
+  critical: 0,
+  warning: 1,
+  normal: 2,
+};
+
 export function UpcomingTicketsClient({ tickets }: { tickets: Ticket[] }) {
   const criticalCount = tickets.filter(
     (t) => getUrgencyLevel(t.departure_at) === "critical"
@@ -66,6 +88,11 @@ export function UpcomingTicketsClient({ tickets }: { tickets: Ticket[] }) {
   const warningCount = tickets.filter(
     (t) => getUrgencyLevel(t.departure_at) === "warning"
   ).length;
+  const sortedTickets = [...tickets].sort(
+    (a, b) =>
+      urgencyOrder[getUrgencyLevel(a.departure_at)] -
+      urgencyOrder[getUrgencyLevel(b.departure_at)]
+  );
 
   return (
     <div className="space-y-6">
@@ -103,7 +130,7 @@ export function UpcomingTicketsClient({ tickets }: { tickets: Ticket[] }) {
         </Card>
       ) : (
         <div className="space-y-3">
-          {tickets.map((ticket) => {
+          {sortedTickets.map((ticket) => {
             const urgency = getUrgencyLevel(ticket.departure_at);
             return (
               <Card
@@ -188,12 +215,23 @@ export function UpcomingTicketsClient({ tickets }: { tickets: Ticket[] }) {
                       </div>
                       {ticket.terminal && (
                         <div className="text-xs text-muted-foreground">
-                          مterminal: {ticket.terminal}
+                          صالة: {ticket.terminal}
                         </div>
                       )}
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
                         <TicketStatusBadge status={ticket.ticket_status as any} />
                         <BookingStatusBadge status={ticket.booking_status as any} />
+                      </div>
+                      <div
+                        className={
+                          "flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium " +
+                          (paymentStatus(ticket).tone === "ok"
+                            ? "bg-emerald-500/10 text-emerald-600"
+                            : "bg-amber-500/10 text-amber-600")
+                        }
+                      >
+                        <Wallet className="h-3.5 w-3.5" />
+                        {paymentStatus(ticket).label}
                       </div>
                     </div>
                   </div>

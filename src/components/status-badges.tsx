@@ -10,42 +10,36 @@ import {
   offer_status_enum,
 } from "@prisma/client";
 
-const bookingStatusMap: Record<booking_status_enum, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+export const bookingStatusMap: Record<booking_status_enum, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   NEW: { label: "جديد", variant: "secondary" },
   WAITING_PAYMENT: { label: "بانتظار الدفع", variant: "outline" },
   WAITING_TICKETING: { label: "بانتظار الإصدار", variant: "outline" },
   TICKETED: { label: "تم الإصدار", variant: "default" },
   COMPLETED: { label: "مكتمل", variant: "default" },
   CANCELLED: { label: "ملغي", variant: "destructive" },
-  PARTIALLY_CANCELLED: { label: "إلغاء جزئي", variant: "destructive" },
+  PARTIALLY_CANCELLED: { label: "ملغي جزئيًا", variant: "destructive" },
   MODIFIED: { label: "تم التعديل", variant: "secondary" },
-  AT_RISK: { label: "تحت المخاطرة", variant: "destructive" },
+  AT_RISK: { label: "الحجز يحتاج متابعة", variant: "destructive" },
 };
 
-const ticketStatusMap: Record<ticket_status_enum, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+export const ticketStatusMap: Record<ticket_status_enum, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending: { label: "قيد الانتظار", variant: "outline" },
   issued: { label: "تم الإصدار", variant: "default" },
   modified: { label: "تم التعديل", variant: "secondary" },
   cancelled: { label: "ملغية", variant: "destructive" },
-  refund_pending: { label: "بانتظار الاسترداد", variant: "outline" },
+  refund_pending: { label: "الاسترداد قيد المتابعة", variant: "outline" },
   partially_refunded: { label: "استرداد جزئي", variant: "secondary" },
   refunded: { label: "مستردة", variant: "default" },
 };
 
-const severityMap: Record<alert_severity_enum, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  info: { label: "معلومات", variant: "secondary" },
-  warning: { label: "تنبيه", variant: "outline" },
-  critical: { label: "حرج", variant: "destructive" },
-};
-
-const paymentStatusMap: Record<payment_status_enum, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+export const paymentStatusMap: Record<payment_status_enum, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending: { label: "قيد الانتظار", variant: "outline" },
-  partially_paid: { label: "مدفوع جزئياً", variant: "secondary" },
+  partially_paid: { label: "مدفوع جزئيًا", variant: "secondary" },
   paid: { label: "مدفوع", variant: "default" },
-  overdue: { label: "متأخر", variant: "destructive" },
+  overdue: { label: "دفعة متأخرة", variant: "destructive" },
 };
 
-const requestStatusMap: Record<booking_request_status_enum, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; className: string }> = {
+export const requestStatusMap: Record<booking_request_status_enum, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; className: string }> = {
   NEW: { label: "جديد", variant: "outline", className: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20" },
   WAITING_FOR_OFFERS: { label: "بانتظار العروض", variant: "outline", className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20" },
   OFFER_SELECTED: { label: "تم اختيار عرض", variant: "outline", className: "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20" },
@@ -53,11 +47,17 @@ const requestStatusMap: Record<booking_request_status_enum, { label: string; var
   CANCELLED: { label: "ملغي", variant: "destructive", className: "" },
 };
 
-const offerStatusMap: Record<offer_status_enum, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+export const offerStatusMap: Record<offer_status_enum, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   received: { label: "مستلم", variant: "secondary" },
   rejected: { label: "مرفوض", variant: "destructive" },
   expired: { label: "منتهي", variant: "outline" },
   cancelled: { label: "ملغي", variant: "destructive" },
+};
+
+const severityMap: Record<alert_severity_enum, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  info: { label: "معلومات", variant: "secondary" },
+  warning: { label: "تنبيه", variant: "outline" },
+  critical: { label: "حرج", variant: "destructive" },
 };
 
 export function BookingStatusBadge({ status }: { status: booking_status_enum }) {

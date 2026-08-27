@@ -32,7 +32,9 @@ export default async function UpcomingTicketsPage() {
       b.id as booking_id,
       b.booking_status,
       b.current_selling_price,
-      b.current_purchase_price
+      b.current_purchase_price,
+      b.issued_before_payment,
+      (SELECT COALESCE(SUM(cp.amount), 0) FROM customer_payments cp WHERE cp.booking_id = b.id) as paid_amount
     FROM tickets t
     JOIN bookings b ON b.id = t.booking_id
     JOIN customers c ON c.id = b.customer_id

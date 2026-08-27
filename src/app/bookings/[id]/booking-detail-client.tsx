@@ -19,6 +19,13 @@ import {
   SeverityBadge,
   EGPAmount,
 } from "@/components/status-badges";
+import { BookingStepper } from "@/components/booking-stepper";
+import { NextActionCard } from "@/components/next-action-card";
+import {
+  bookingNeedsAttention,
+  bookingNextAction,
+  totalPaid,
+} from "@/lib/booking-flow";
 import {
   Dialog,
   DialogContent,
@@ -95,6 +102,7 @@ export function BookingDetailClient({ booking }: { booking: any }) {
   );
 
   const bookingId = String(booking.id);
+  const [activeTab, setActiveTab] = useState("overview");
   const [passengerOpen, setPassengerOpen] = useState(false);
   const [editingPassenger, setEditingPassenger] = useState<any>(null);
   const [passengerSubmitting, setPassengerSubmitting] = useState(false);
@@ -227,8 +235,75 @@ export function BookingDetailClient({ booking }: { booking: any }) {
         </Card>
       )}
 
+      {/* Financial bar */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <div className="text-xs text-muted-foreground">سعر البيع</div>
+              <div className="text-xl font-bold">
+                <EGPAmount amount={booking.current_selling_price} />
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">المدفوع</div>
+              <div className="text-xl font-bold text-emerald-600">
+                <EGPAmount amount={totalPaid(booking)} />
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">المتبقي</div>
+              <div
+                className={
+                  "text-xl font-bold " +
+                  (Number(booking.current_selling_price) - totalPaid(booking) > 0
+                    ? "text-amber-600"
+                    : "text-emerald-600")
+                }
+              >
+                <EGPAmount
+                  amount={Math.max(0, Number(booking.current_selling_price) - totalPaid(booking))}
+                />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Next action + lifecycle */}
+      <NextActionCard
+        booking={booking}
+        onPrimary={() => {
+          const action = bookingNextAction(booking);
+          if (action?.key === "issue-ticket") setActiveTab("tickets");
+          else if (
+            action?.key === "collect-payment" ||
+            action?.key === "gather-payment"
+          )
+            setActiveTab("payments");
+        }}
+      />
+      {bookingNeedsAttention(booking) && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+          <AlertTriangle className="h-4 w-4" />
+          <span>
+            هذا الحجز يحتاج متابعة: {booking.risk_reason || "إصدار قبل الدفع غير محصَّل أو استرداد قيد المتابعة"}.
+          </span>
+        </div>
+      )}
+
+      {/* Lifecycle */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="mb-2 text-xs font-medium text-muted-foreground">
+            دورة الحجز
+          </div>
+          <BookingStepper status={booking.booking_status} />
+        </CardContent>
+      </Card>
+
       {/* Tabs */}
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-6">
           <TabsTrigger value="overview" className="flex items-center gap-1">
             <FileText className="h-4 w-4" />
