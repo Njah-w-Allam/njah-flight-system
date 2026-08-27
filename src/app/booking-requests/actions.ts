@@ -33,7 +33,7 @@ export async function createBookingRequest(data: {
     customerId = customer.id;
   }
 
-  await prisma.booking_requests.create({
+  const created = await prisma.booking_requests.create({
     data: {
       customer_id: customerId,
       origin: data.origin,
@@ -49,7 +49,8 @@ export async function createBookingRequest(data: {
   });
 
   revalidatePath("/booking-requests");
-  redirect(`/booking-requests`);
+  revalidatePath("/dashboard");
+  redirect(`/execution-offers?request=${created.id}`);
 }
 
 export async function updateBookingRequestStatus(

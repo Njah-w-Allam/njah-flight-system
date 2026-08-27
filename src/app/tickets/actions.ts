@@ -4,21 +4,24 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
 export async function createTicket(formData: FormData) {
-  const bookingId = BigInt(formData.get("booking_id") as string);
-  const airlineId = BigInt(formData.get("airline_id") as string);
+  const bookingIdRaw = formData.get("booking_id") as string;
+  const airlineIdRaw = formData.get("airline_id") as string;
+
+  if (!bookingIdRaw) {
+    throw new Error("رقم الحجز مطلوب");
+  }
+
+  if (!airlineIdRaw) {
+    throw new Error("يجب اختيار شركة الطيران");
+  }
+
+  const bookingId = BigInt(bookingIdRaw);
+  const airlineId = BigInt(airlineIdRaw);
   const ticketNumber = (formData.get("ticket_number") as string) || null;
   const pnr = (formData.get("pnr") as string) || null;
   const ticketPriceRaw = formData.get("ticket_price") as string;
   const notes = (formData.get("notes") as string) || null;
   const passengerIds = formData.getAll("passenger_ids") as string[];
-
-  if (!formData.get("booking_id")) {
-    throw new Error("رقم الحجز مطلوب");
-  }
-
-  if (!formData.get("airline_id")) {
-    throw new Error("يجب اختيار شركة الطيران");
-  }
 
   const ticketPrice = ticketPriceRaw ? parseFloat(ticketPriceRaw) : 0;
 

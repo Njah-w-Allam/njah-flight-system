@@ -33,6 +33,8 @@ export async function createExecutionOffer(data: {
   });
 
   revalidatePath("/execution-offers");
+  revalidatePath("/dashboard");
+  revalidatePath("/bookings");
   return { success: true, id: String(offer.id) };
 }
 

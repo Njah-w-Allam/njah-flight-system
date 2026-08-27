@@ -73,13 +73,14 @@ export async function createCustomerQuick(formData: FormData) {
 export async function createPaymentQuick(formData: FormData) {
   const bookingId = formData.get("booking_id") as string;
   const customerId = formData.get("customer_id") as string;
-  const amount = formData.get("amount") as string;
+  const amountRaw = formData.get("amount") as string;
   const paymentMethod = formData.get("payment_method") as string;
   const notes = (formData.get("notes") as string)?.trim() || null;
 
   if (!bookingId) throw new Error("يجب اختيار الحجز");
   if (!customerId) throw new Error("يجب اختيار العميل");
-  if (!amount || Number(amount) <= 0) throw new Error("يجب إدخال مبلغ صحيح");
+  const amount = Number(amountRaw);
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("يجب إدخال مبلغ صحيح");
   if (!paymentMethod) throw new Error("يجب اختيار طريقة الدفع");
 
   const valid: payment_method_enum[] = ["cash", "instapay", "vodafone_cash"];
@@ -87,11 +88,20 @@ export async function createPaymentQuick(formData: FormData) {
     throw new Error("طريقة الدفع غير صحيحة");
   }
 
+  const booking = await prisma.bookings.findUnique({
+    where: { id: BigInt(bookingId) },
+    select: { customer_id: true },
+  });
+  if (!booking) throw new Error("الحجز غير موجود");
+  if (String(booking.customer_id) !== String(customerId)) {
+    throw new Error("العميل لا يتبع هذا الحجز");
+  }
+
   await prisma.customer_payments.create({
     data: {
       booking_id: BigInt(bookingId),
       customer_id: BigInt(customerId),
-      amount: Number(amount),
+      amount,
       payment_method: paymentMethod as payment_method_enum,
       notes,
     },
@@ -104,16 +114,19 @@ export async function createPaymentQuick(formData: FormData) {
 }
 
 export async function createTicketQuick(formData: FormData) {
-  const bookingId = BigInt(formData.get("booking_id") as string);
-  const airlineId = BigInt(formData.get("airline_id") as string);
+  const bookingIdRaw = formData.get("booking_id") as string;
+  const airlineIdRaw = formData.get("airline_id") as string;
+
+  if (!bookingIdRaw) throw new Error("رقم الحجز مطلوب");
+  if (!airlineIdRaw) throw new Error("يجب اختيار شركة الطيران");
+
+  const bookingId = BigInt(bookingIdRaw);
+  const airlineId = BigInt(airlineIdRaw);
   const ticketNumber = (formData.get("ticket_number") as string)?.trim() || null;
   const pnr = (formData.get("pnr") as string)?.trim() || null;
   const ticketPrice = parseFloat((formData.get("ticket_price") as string) || "0");
   const notes = (formData.get("notes") as string)?.trim() || null;
   const passengerIds = formData.getAll("passenger_ids") as string[];
-
-  if (!formData.get("booking_id")) throw new Error("رقم الحجز مطلوب");
-  if (!formData.get("airline_id")) throw new Error("يجب اختيار شركة الطيران");
 
   const ticket = await prisma.tickets.create({
     data: {

@@ -31,7 +31,9 @@ type Company = { id: bigint; name: string };
 type BookingRow = {
   id: bigint;
   booking_reference?: string | null;
-  customer?: { name?: string } | null;
+  current_selling_price?: number | null;
+  customer?: { name?: string; id?: bigint } | null;
+  customer_payments?: { amount?: number | null }[];
 };
 type RequestRow = {
   id: bigint;
@@ -59,9 +61,30 @@ export function QuickActions({
   const [open, setOpen] = useState<QuickAction>(null);
   const [pending, startTransition] = useTransition();
   const [isNewCustomer, setIsNewCustomer] = useState(false);
+  const [paymentBookingId, setPaymentBookingId] = useState<string>("");
+  const [paymentAmount, setPaymentAmount] = useState<string>("");
+
+  const selectedBooking = open === "payment"
+    ? bookings.find((b) => String(b.id) === paymentBookingId)
+    : undefined;
+  const paymentCustomerId = selectedBooking?.customer?.id
+    ? String(selectedBooking.customer.id)
+    : "";
+  const paymentRemaining = selectedBooking
+    ? Math.max(
+        0,
+        Number(selectedBooking.current_selling_price || 0) -
+          (selectedBooking.customer_payments || []).reduce(
+            (s, p) => s + Number(p.amount || 0),
+            0
+          )
+      )
+    : 0;
 
   function handle(act: Exclude<QuickAction, null>) {
     setIsNewCustomer(false);
+    setPaymentBookingId("");
+    setPaymentAmount("");
     setOpen(act);
   }
 
@@ -227,13 +250,15 @@ export function QuickActions({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              run(() => createPaymentQuick(new FormData(e.currentTarget)), "تم تسجيل الدفعة");
+              const fd = new FormData(e.currentTarget);
+              fd.set("customer_id", paymentCustomerId);
+              run(() => createPaymentQuick(fd), "تم تسجيل الدفعة");
             }}
             className="space-y-3"
           >
             <div className="space-y-2">
               <Label>الحجز</Label>
-              <Select name="booking_id" required>
+              <Select name="booking_id" required value={paymentBookingId} onValueChange={(v) => { setPaymentBookingId(v ?? ""); setPaymentAmount(""); }}>
                 <SelectTrigger><SelectValue placeholder="اختر الحجز..." /></SelectTrigger>
                 <SelectContent>
                   {bookings.map((b) => (
@@ -244,23 +269,42 @@ export function QuickActions({
                 </SelectContent>
               </Select>
             </div>
+            {selectedBooking && (
+              <div className="rounded-lg border bg-muted/50 p-3 text-sm">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>العميل</span>
+                  <span className="font-medium text-foreground">{selectedBooking.customer?.name ?? "—"}</span>
+                </div>
+                {paymentRemaining > 0 ? (
+                  <div className="mt-1 flex items-center justify-between text-amber-600">
+                    <span>المتبقي على الحجز</span>
+                    <span className="font-semibold">{paymentRemaining.toLocaleString("ar-EG-u-nu-latn")} ج.م</span>
+                  </div>
+                ) : (
+                  <div className="mt-1 flex items-center justify-between text-emerald-600">
+                    <span>المتبقي على الحجز</span>
+                    <span className="font-semibold">0 ج.م — مكتمل</span>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-2">
-                <Label>العميل</Label>
-                <Select name="customer_id" required>
-                  <SelectTrigger><SelectValue placeholder="اختر العميل..." /></SelectTrigger>
-                  <SelectContent>
-                    {customers.map((c) => (
-                      <SelectItem key={String(c.id)} value={String(c.id)}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>المبلغ (ج.م)</Label>
+                <Input
+                  name="amount"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  placeholder="0.00"
+                  value={paymentAmount || (paymentRemaining > 0 ? String(paymentRemaining) : "")}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  dir="ltr"
+                  className="text-left"
+                />
               </div>
               <div className="space-y-2">
-                <Label>المبلغ (ج.م)</Label>
-                <Input name="amount" type="number" step="0.01" min="0.01" required placeholder="0.00" />
-              </div>
-              <div className="space-y-2 col-span-2">
                 <Label>طريقة الدفع</Label>
                 <Select name="payment_method" required>
                   <SelectTrigger><SelectValue placeholder="اختر الطريقة..." /></SelectTrigger>
@@ -278,7 +322,7 @@ export function QuickActions({
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(null)}>إلغاء</Button>
-              <Button type="submit" disabled={pending}>
+              <Button type="submit" disabled={pending || !paymentCustomerId}>
                 {pending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : null}
                 تسجيل الدفعة
               </Button>

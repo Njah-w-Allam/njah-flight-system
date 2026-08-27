@@ -19,7 +19,8 @@ export async function createCustomerPayment(formData: FormData) {
     throw new Error("يجب اختيار العميل");
   }
 
-  if (!amount || Number(amount) <= 0) {
+  const amountNum = Number(amount);
+  if (!Number.isFinite(amountNum) || amountNum <= 0) {
     throw new Error("يجب إدخال مبلغ صحيح");
   }
 
@@ -32,15 +33,26 @@ export async function createCustomerPayment(formData: FormData) {
     throw new Error("طريقة الدفع غير صحيحة");
   }
 
+  const booking = await prisma.bookings.findUnique({
+    where: { id: BigInt(bookingId) },
+    select: { customer_id: true },
+  });
+  if (!booking) throw new Error("الحجز غير موجود");
+  if (String(booking.customer_id) !== String(customerId)) {
+    throw new Error("العميل لا يتبع هذا الحجز");
+  }
+
   await prisma.customer_payments.create({
     data: {
       booking_id: BigInt(bookingId),
       customer_id: BigInt(customerId),
-      amount: Number(amount),
+      amount: amountNum,
       payment_method: paymentMethod as payment_method_enum,
       notes: notes?.trim() || null,
     },
   });
 
   revalidatePath("/customer-payments");
+  revalidatePath("/dashboard");
+  revalidatePath("/bookings");
 }
