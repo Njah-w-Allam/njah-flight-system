@@ -24,9 +24,9 @@ export default async function CustomerDetailPage({
           execution_company: true,
           flight_segments: {
             orderBy: { segment_order: "asc" },
-            take: 1,
           },
           tickets: true,
+          customer_payments: true,
         },
         orderBy: { created_at: "desc" },
       },

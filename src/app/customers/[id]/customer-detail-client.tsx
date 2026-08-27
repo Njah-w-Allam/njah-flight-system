@@ -28,7 +28,15 @@ import {
   Phone,
   MapPin,
 } from "lucide-react";
-import { credit_status_enum, payment_method_enum } from "@prisma/client";
+import {
+  credit_status_enum,
+  payment_method_enum,
+  booking_status_enum,
+} from "@prisma/client";
+import {
+  effectiveBookingStatus,
+  bookingNextAction,
+} from "@/lib/booking-flow";
 
 const creditStatusMap: Record<
   credit_status_enum,
@@ -310,18 +318,19 @@ export function CustomerDetailClient({ customer }: { customer: any }) {
                       <TableHead className="text-right">الحالة</TableHead>
                       <TableHead className="text-right">سعر البيع</TableHead>
                       <TableHead className="text-right">التذاكر</TableHead>
+                      <TableHead className="text-right">الإجراء التالي</TableHead>
                       <TableHead className="text-right">التفاصيل</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {customer.bookings.length === 0 ? (
                       <TableRow>
-                        <TableCell
-                          colSpan={9}
-                          className="text-center py-8 text-muted-foreground"
-                        >
-                          لا توجد حجوزات لهذا العميل
-                        </TableCell>
+                          <TableCell
+                            colSpan={10}
+                            className="text-center py-8 text-muted-foreground"
+                          >
+                            لا توجد حجوزات لهذا العميل
+                          </TableCell>
                       </TableRow>
                     ) : (
                       customer.bookings.map((booking: any) => {
@@ -330,6 +339,9 @@ export function CustomerDetailClient({ customer }: { customer: any }) {
                           booking.flight_segments[
                             booking.flight_segments.length - 1
                           ];
+                        const effective =
+                          effectiveBookingStatus(booking) as booking_status_enum;
+                        const next = bookingNextAction(booking);
                         return (
                           <TableRow key={booking.id}>
                             <TableCell className="font-medium">
@@ -356,9 +368,7 @@ export function CustomerDetailClient({ customer }: { customer: any }) {
                             </TableCell>
                             <TableCell>{formatDate(booking.depart_date)}</TableCell>
                             <TableCell>
-                              <BookingStatusBadge
-                                status={booking.booking_status}
-                              />
+                              <BookingStatusBadge status={effective} />
                             </TableCell>
                             <TableCell>
                               <EGPAmount
@@ -381,6 +391,21 @@ export function CustomerDetailClient({ customer }: { customer: any }) {
                                   </Badge>
                                 ))}
                               </div>
+                            </TableCell>
+                            <TableCell>
+                              {next && (
+                                <span
+                                  className={
+                                    next.severity === "critical"
+                                      ? "inline-flex items-center rounded-md bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive"
+                                      : next.severity === "warning"
+                                        ? "inline-flex items-center rounded-md bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700"
+                                        : "text-xs text-muted-foreground"
+                                  }
+                                >
+                                  {next.title}
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell>
                               <Link href={`/bookings/${booking.id}`}>

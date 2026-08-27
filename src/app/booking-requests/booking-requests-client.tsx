@@ -90,6 +90,45 @@ export function BookingRequestsClient({
         </Link>
       </div>
 
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        {[
+          { status: "NEW", label: "طلبات جديدة", variant: "text-destructive" },
+          {
+            status: "WAITING_FOR_OFFERS",
+            label: "بانتظار العروض",
+            variant: "text-amber-600",
+          },
+          {
+            status: "OFFER_SELECTED",
+            label: "تم اختيار عرض",
+            variant: "text-primary",
+          },
+          {
+            status: "CONVERTED",
+            label: "تم التحويل",
+            variant: "text-green-600",
+          },
+          {
+            status: "CANCELLED",
+            label: "ملغية",
+            variant: "text-muted-foreground",
+          },
+        ].map(({ status, label, variant }) => {
+          const count = requests.filter((r) => r.status === status).length;
+          return (
+            <div
+              key={status}
+              className="rounded-lg border bg-card p-3 text-center"
+            >
+              <div className={`text-2xl font-bold ${variant}`}>{count}</div>
+              <div className="text-xs text-muted-foreground mt-1">
+                {label}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       <div className="flex flex-col gap-4 md:flex-row">
         <div className="relative flex-1">
           <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
