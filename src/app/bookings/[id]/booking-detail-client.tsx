@@ -44,6 +44,7 @@ import {
   updatePassenger,
 } from "@/app/passengers/actions";
 import { issueTicket, cancelTicket } from "@/app/tickets/actions";
+import { WhatsAppRequestDialog } from "@/components/whatsapp-request-dialog";
 import { toast } from "sonner";
 import Link from "next/link";
 import {
@@ -61,6 +62,10 @@ import {
   Trash2,
   CheckCircle,
   XCircle,
+  MessageCircle,
+  Phone,
+  Send,
+  Building2,
 } from "lucide-react";
 
 function formatDate(date: Date | string | null) {
@@ -112,6 +117,7 @@ export function BookingDetailClient({ booking }: { booking: any }) {
     action: "issue" | "cancel";
   } | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [whatsappOpen, setWhatsappOpen] = useState(false);
 
   async function handlePassengerSubmit(formData: FormData) {
     setPassengerSubmitting(true);
@@ -291,6 +297,54 @@ export function BookingDetailClient({ booking }: { booking: any }) {
           </span>
         </div>
       )}
+
+      {/* Execution company communication */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            شركة التنفيذ
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted">
+                <Building2 className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <div className="font-medium">
+                  {booking.execution_company?.name ?? "—"}
+                </div>
+                {booking.execution_company?.phone && (
+                  <div className="text-sm text-muted-foreground" dir="ltr">
+                    {booking.execution_company.phone}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {booking.execution_company?.phone && (
+                <a
+                  href={`tel:${booking.execution_company.phone}`}
+                  className="inline-flex"
+                >
+                  <Button variant="outline" size="sm">
+                    <Phone className="ml-2 h-4 w-4" />
+                    اتصال
+                  </Button>
+                </a>
+              )}
+              <Button
+                variant="default"
+                size="sm"
+                className="bg-green-600 hover:bg-green-700"
+                onClick={() => setWhatsappOpen(true)}
+              >
+                <MessageCircle className="ml-2 h-4 w-4" />
+                إرسال الطلب عبر واتساب
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Lifecycle */}
       <Card>
@@ -847,6 +901,15 @@ export function BookingDetailClient({ booking }: { booking: any }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* WhatsApp request dialog */}
+      <WhatsAppRequestDialog
+        open={whatsappOpen}
+        onOpenChange={setWhatsappOpen}
+        booking={booking}
+        targetLabel={booking.execution_company?.name}
+        targetPhone={booking.execution_company?.phone}
+      />
     </div>
   );
 }
