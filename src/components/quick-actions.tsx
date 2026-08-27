@@ -24,10 +24,14 @@ import {
   createTicketQuick,
   createOfferQuick,
 } from "@/app/dashboard/actions";
+import { AirportCombobox } from "@/components/airport-combobox";
+import { getAirportLabel, type Airport } from "@/lib/airports";
+import { BookingWhatsAppDialog } from "@/components/booking-created-whatsapp-dialog";
+import type { WhatsAppSource } from "@/lib/whatsapp";
 
 type ActiveCustomer = { id: bigint; name: string; phone: string };
 type Airline = { id: bigint; name: string; code?: string | null };
-type Company = { id: bigint; name: string };
+type Company = { id: bigint; name: string; phone?: string | null };
 type BookingRow = {
   id: bigint;
   booking_reference?: string | null;
@@ -64,6 +68,16 @@ export function QuickActions({
   const [paymentBookingId, setPaymentBookingId] = useState<string>("");
   const [paymentAmount, setPaymentAmount] = useState<string>("");
 
+  const [bookingOrigin, setBookingOrigin] = useState<Airport | null>(null);
+  const [bookingDestination, setBookingDestination] = useState<Airport | null>(null);
+  const [createdSource, setCreatedSource] = useState<{ id: string; source: WhatsAppSource } | null>(null);
+
+  function resetBookingForm() {
+    setIsNewCustomer(false);
+    setBookingOrigin(null);
+    setBookingDestination(null);
+  }
+
   const selectedBooking = open === "payment"
     ? bookings.find((b) => String(b.id) === paymentBookingId)
     : undefined;
@@ -85,6 +99,7 @@ export function QuickActions({
     setIsNewCustomer(false);
     setPaymentBookingId("");
     setPaymentAmount("");
+    if (act !== "new-booking") resetBookingForm();
     setOpen(act);
   }
 
@@ -120,8 +135,8 @@ export function QuickActions({
       </div>
 
       {/* New booking modal */}
-      <Dialog open={open === "new-booking"} onOpenChange={(o) => !o && setOpen(null)}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={open === "new-booking"} onOpenChange={(o) => { if (!o) { setOpen(null); resetBookingForm(); } }}>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>حجز جديد</DialogTitle>
             <DialogDescription>
@@ -132,9 +147,28 @@ export function QuickActions({
             onSubmit={(e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
-              run(
-                () =>
-                  createBookingRequestQuick({
+              let customerName = customers.find((c) => String(c.id) === (fd.get("customer_id") as string))?.name;
+              let customerPhone: string | undefined = customers.find((c) => String(c.id) === (fd.get("customer_id") as string))?.phone;
+              if (isNewCustomer) {
+                customerName = (fd.get("new_customer_name") as string) || undefined;
+                customerPhone = (fd.get("new_customer_phone") as string) || undefined;
+              }
+              const source: WhatsAppSource = {
+                customer: customerName ? { name: customerName, phone: customerPhone } : null,
+                depart_date: (fd.get("depart_date") as string) || null,
+                return_date: (fd.get("return_date") as string) || null,
+                passengers: Array.from({ length: Number(fd.get("passengers_count")) || 1 }),
+                booking_reference: null,
+                flight_segments: [
+                  {
+                    from_location: bookingOrigin ? getAirportLabel(bookingOrigin) : (fd.get("origin") as string) || "",
+                    to_location: bookingDestination ? getAirportLabel(bookingDestination) : (fd.get("destination") as string) || "",
+                  },
+                ],
+              };
+              startTransition(async () => {
+                try {
+                  const res = await createBookingRequestQuick({
                     customer_id: isNewCustomer
                       ? undefined
                       : ((fd.get("customer_id") as string) || undefined),
@@ -144,15 +178,21 @@ export function QuickActions({
                     new_customer_phone: isNewCustomer
                       ? ((fd.get("new_customer_phone") as string) || undefined)
                       : undefined,
-                    origin: fd.get("origin") as string,
-                    destination: fd.get("destination") as string,
+                    origin: bookingOrigin ? getAirportLabel(bookingOrigin) : (fd.get("origin") as string),
+                    destination: bookingDestination ? getAirportLabel(bookingDestination) : (fd.get("destination") as string),
                     depart_date: fd.get("depart_date") as string,
                     passengers_count: Number(fd.get("passengers_count")) || 1,
                     return_date: (fd.get("return_date") as string) || undefined,
-                  }),
-                "تم إنشاء الطلب",
-                (res: any) => `/execution-offers?request=${res.id}`
-              );
+                  });
+                  source.id = res.id;
+                  toast.success("تم إنشاء الطلب");
+                  setOpen(null);
+                  resetBookingForm();
+                  setCreatedSource({ id: String(res.id), source });
+                } catch (err: any) {
+                  toast.error("خطأ", { description: err.message || "حدث خطأ" });
+                }
+              });
             }}
             className="space-y-3"
           >
@@ -184,14 +224,30 @@ export function QuickActions({
               )}
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1"><Label>من</Label><Input name="origin" required placeholder="القاهرة" /></div>
-              <div className="space-y-1"><Label>إلى</Label><Input name="destination" required placeholder="دبي" /></div>
+              <div className="space-y-1">
+                <Label>من (المطار)</Label>
+                <AirportCombobox
+                  value={bookingOrigin?.code ?? ""}
+                  onChange={setBookingOrigin}
+                  placeholder="اختر مطار المغادرة..."
+                  ariaLabel="اختر مطار المغادرة"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>إلى (المطار)</Label>
+                <AirportCombobox
+                  value={bookingDestination?.code ?? ""}
+                  onChange={setBookingDestination}
+                  placeholder="اختر مطار الوصول..."
+                  ariaLabel="اختر مطار الوصول"
+                />
+              </div>
               <div className="space-y-1"><Label>تاريخ السفر</Label><Input name="depart_date" type="date" required /></div>
               <div className="space-y-1"><Label>عدد المسافرين</Label><Input name="passengers_count" type="number" min={1} defaultValue={1} /></div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(null)}>إلغاء</Button>
-              <Button type="submit" disabled={pending}>
+              <Button type="button" variant="outline" onClick={() => { setOpen(null); resetBookingForm(); }}>إلغاء</Button>
+              <Button type="submit" disabled={pending || !bookingOrigin || !bookingDestination}>
                 {pending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : null}
                 إنشاء الحجز
               </Button>
@@ -199,6 +255,15 @@ export function QuickActions({
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Post-create WhatsApp dialog */}
+      <BookingWhatsAppDialog
+        open={!!createdSource}
+        onOpenChange={(o) => { if (!o) setCreatedSource(null); }}
+        requestSource={createdSource?.source ?? { flight_segments: [] }}
+        requestId={createdSource?.id ?? ""}
+        companies={companies}
+      />
 
       {/* New customer modal */}
       <Dialog open={open === "new-customer"} onOpenChange={(o) => !o && setOpen(null)}>
