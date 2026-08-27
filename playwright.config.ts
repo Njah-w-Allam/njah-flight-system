@@ -12,6 +12,7 @@ export default defineConfig({
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    storageState: "./tests/.auth/storage-state.json",
   },
   webServer: {
     command: "npm run dev",
