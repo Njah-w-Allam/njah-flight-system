@@ -40,3 +40,9 @@ next-env.d.ts
 supabase/.temp/
 
 .vercel
+
+# scratch / screenshots
+capture-screenshots.js
+screenshots/
+screenshots.zip
+test-results/

@@ -21,6 +21,11 @@ export default async function DashboardPage() {
     overduePayments,
     executionDue,
     openAlerts,
+    inProgressBookings,
+    waitingRequests,
+    activeCustomers,
+    airlines,
+    executionCompanies,
   ] = await Promise.all([
     prisma.bookings.findMany({
       where: {
@@ -89,6 +94,34 @@ export default async function DashboardPage() {
       include: { booking: true, customer: true, execution_company: true },
       orderBy: [{ severity: "desc" }, { created_at: "desc" }],
     }),
+    prisma.bookings.findMany({
+      where: { booking_status: { notIn: ["COMPLETED", "CANCELLED"] } },
+      include: {
+        customer: true,
+        execution_company: true,
+        flight_segments: true,
+        customer_payments: true,
+        tickets: true,
+      },
+      orderBy: { updated_at: "desc" },
+      take: 20,
+    }),
+    prisma.booking_requests.findMany({
+      where: { status: { notIn: ["CONVERTED", "CANCELLED"] } },
+      include: { customer: true },
+      orderBy: { updated_at: "desc" },
+      take: 20,
+    }),
+    prisma.customers.findMany({
+      orderBy: { name: "asc" },
+      take: 200,
+    }),
+    prisma.airlines.findMany({
+      orderBy: { name: "asc" },
+    }),
+    prisma.execution_companies.findMany({
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   return (
@@ -101,6 +134,11 @@ export default async function DashboardPage() {
       overduePayments={serializeDecimal(overduePayments)}
       executionDue={serializeDecimal(executionDue)}
       openAlerts={serializeDecimal(openAlerts)}
+      inProgressBookings={serializeDecimal(inProgressBookings)}
+      waitingRequests={serializeDecimal(waitingRequests)}
+      activeCustomers={serializeDecimal(activeCustomers)}
+      airlines={serializeDecimal(airlines)}
+      executionCompanies={serializeDecimal(executionCompanies)}
     />
   );
 }

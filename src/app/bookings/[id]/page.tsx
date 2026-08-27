@@ -52,5 +52,16 @@ export default async function BookingDetailPage({
     notFound();
   }
 
-  return <BookingDetailClient booking={serializeDecimal(booking)} />;
+  const [airlines, executionCompanies] = await Promise.all([
+    prisma.airlines.findMany({ orderBy: { name: "asc" } }),
+    prisma.execution_companies.findMany({ orderBy: { name: "asc" } }),
+  ]);
+
+  return (
+    <BookingDetailClient
+      booking={serializeDecimal(booking)}
+      airlines={serializeDecimal(airlines)}
+      executionCompanies={serializeDecimal(executionCompanies)}
+    />
+  );
 }

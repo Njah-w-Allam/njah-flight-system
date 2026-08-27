@@ -45,6 +45,7 @@ import {
 } from "@/app/passengers/actions";
 import { issueTicket, cancelTicket } from "@/app/tickets/actions";
 import { WhatsAppRequestDialog } from "@/components/whatsapp-request-dialog";
+import { BookingQuickActions } from "@/components/booking-quick-actions";
 import { toast } from "sonner";
 import Link from "next/link";
 import {
@@ -96,7 +97,7 @@ function toDateInputValue(date: Date | string | null) {
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
-export function BookingDetailClient({ booking }: { booking: any }) {
+export function BookingDetailClient({ booking, airlines, executionCompanies }: { booking: any; airlines: any[]; executionCompanies: any[] }) {
   const totalCustomerPayments = booking.customer_payments.reduce(
     (sum: number, p: any) => sum + Number(p.amount),
     0
@@ -202,6 +203,13 @@ export function BookingDetailClient({ booking }: { booking: any }) {
           </p>
         </div>
       </div>
+
+      {/* Quick actions */}
+      <BookingQuickActions
+        booking={booking}
+        airlines={airlines}
+        companies={executionCompanies}
+      />
 
       {/* Route Visual */}
       {booking.flight_segments.length > 0 && (
