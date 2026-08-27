@@ -76,17 +76,44 @@ test.describe("New Booking Request Form", () => {
     await expect(page.getByText("بيانات العميل")).toBeVisible();
   });
 
-  test("has existing customer / new customer toggle", async ({ page }) => {
-    await expect(page.getByRole("button", { name: /عميل موجود/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /عميل جديد/ })).toBeVisible();
+  test("customer field is a searchable typeahead", async ({ page }) => {
+    const trigger = page.locator('[role="combobox"][aria-label="بحث عن عميل"]');
+    await expect(trigger).toBeVisible();
+    await trigger.click();
+    await expect(page.getByPlaceholder("ابحث بالاسم أو رقم الهاتف...")).toBeVisible();
+    await expect(page.getByText("العملاء المطابقون")).toBeVisible();
   });
 
-  test("clicking new customer shows name and phone inputs", async ({ page }) => {
-    const newCustomerBtn = page.getByRole("button", { name: /عميل جديد/ });
-    await newCustomerBtn.click();
+  test("typing phone digits filters customers and offers new-customer creation", async ({ page }) => {
+    await page.locator('[role="combobox"][aria-label="بحث عن عميل"]').click();
+    const search = page.getByPlaceholder("ابحث بالاسم أو رقم الهاتف...");
+    await expect(search).toBeVisible();
+    // Phone prefix for فاطمة (01123456789): first 3 digits "011"
+    await search.fill("0112");
+    await page.waitForTimeout(300);
+    await expect(page.locator("[cmdk-item]").filter({ hasText: "فاطمة" }).first()).toBeVisible();
+    // Non-empty query exposes the "add new customer" item
+    await expect(page.locator("[cmdk-item]").filter({ hasText: "إضافة عميل جديد" }).first()).toBeVisible();
+  });
 
-    await expect(page.getByLabel("اسم العميل")).toBeVisible();
-    await expect(page.getByLabel("رقم الهاتف")).toBeVisible();
+  test("typeahead new-customer flow requires name and phone before confirming", async ({ page }) => {
+    await page.locator('[role="combobox"][aria-label="بحث عن عميل"]').click();
+    const search = page.getByPlaceholder("ابحث بالاسم أو رقم الهاتف...");
+    await search.fill("بي جي سي");
+    await page.waitForTimeout(300);
+    await page.locator("[cmdk-item]").filter({ hasText: "إضافة عميل جديد" }).click();
+    // New-customer editing panel appears
+    await expect(page.getByText("عميل جديد")).toBeVisible();
+    const name = page.getByPlaceholder("اسم العميل");
+    const phone = page.getByPlaceholder("01xxxxxxxxx");
+    await expect(name).toBeVisible();
+    await expect(phone).toBeVisible();
+    // Confirm is disabled until both are filled
+    const confirm = page.getByRole("button", { name: /تأكيد العميل الجديد/ });
+    await expect(confirm).toBeDisabled();
+    await name.fill("عميل بي جي سي");
+    await phone.fill("0109998877");
+    await expect(confirm).toBeEnabled();
   });
 
   test("displays flight details section", async ({ page }) => {

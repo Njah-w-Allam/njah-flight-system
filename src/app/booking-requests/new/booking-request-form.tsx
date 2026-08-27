@@ -16,6 +16,7 @@ import {
 import { createBookingRequest } from "../actions";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { CustomerField, type CustomerSelection } from "@/components/customer-field";
 
 interface Customer {
   id: bigint;
@@ -24,10 +25,7 @@ interface Customer {
 }
 
 export function BookingRequestForm({ customers }: { customers: Customer[] }) {
-  const [isNewCustomer, setIsNewCustomer] = useState(false);
-  const [selectedCustomerId, setSelectedCustomerId] = useState("");
-  const [newCustomerName, setNewCustomerName] = useState("");
-  const [newCustomerPhone, setNewCustomerPhone] = useState("");
+  const [customer, setCustomer] = useState<CustomerSelection>(null);
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [tripType, setTripType] = useState<"one_way" | "round_trip">("one_way");
@@ -41,6 +39,11 @@ export function BookingRequestForm({ customers }: { customers: Customer[] }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setIsSubmitting(true);
+
+    if (!customer) {
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const data: {
@@ -56,7 +59,7 @@ export function BookingRequestForm({ customers }: { customers: Customer[] }) {
         new_customer_name?: string;
         new_customer_phone?: string;
       } = {
-        customer_id: isNewCustomer ? BigInt(0) : BigInt(selectedCustomerId),
+        customer_id: customer.kind === "existing" ? BigInt(customer.id) : BigInt(0),
         origin,
         destination,
         trip_type: tripType,
@@ -67,9 +70,9 @@ export function BookingRequestForm({ customers }: { customers: Customer[] }) {
         notes: notes || null,
       };
 
-      if (isNewCustomer) {
-        data.new_customer_name = newCustomerName;
-        data.new_customer_phone = newCustomerPhone;
+      if (customer.kind === "new") {
+        data.new_customer_name = customer.name;
+        data.new_customer_phone = customer.phone;
       }
 
       await createBookingRequest(data);
@@ -95,68 +98,18 @@ export function BookingRequestForm({ customers }: { customers: Customer[] }) {
             <CardTitle className="text-base">بيانات العميل</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-4">
-              <Button
-                type="button"
-                variant={isNewCustomer ? "outline" : "default"}
-                size="sm"
-                onClick={() => setIsNewCustomer(false)}
-              >
-                عميل موجود
-              </Button>
-              <Button
-                type="button"
-                variant={isNewCustomer ? "default" : "outline"}
-                size="sm"
-                onClick={() => setIsNewCustomer(true)}
-              >
-                عميل جديد
-              </Button>
+            <div className="space-y-2">
+              <Label>العميل (اكتب الاسم أو رقم الهاتف)</Label>
+              <CustomerField
+                customers={customers.map((c) => ({
+                  id: String(c.id),
+                  name: c.name,
+                  phone: c.phone,
+                }))}
+                value={customer}
+                onChange={setCustomer}
+              />
             </div>
-
-            {isNewCustomer ? (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="newCustomerName">اسم العميل</Label>
-                  <Input
-                    id="newCustomerName"
-                    value={newCustomerName}
-                    onChange={(e) => setNewCustomerName(e.target.value)}
-                    placeholder="أدخل اسم العميل"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="newCustomerPhone">رقم الهاتف</Label>
-                  <Input
-                    id="newCustomerPhone"
-                    value={newCustomerPhone}
-                    onChange={(e) => setNewCustomerPhone(e.target.value)}
-                    placeholder="أدخل رقم الهاتف"
-                    required
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Label>اختر العميل</Label>
-                <Select
-                  value={selectedCustomerId}
-                  onValueChange={(v) => v && setSelectedCustomerId(v)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="اختر عميل..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((c) => (
-                      <SelectItem key={String(c.id)} value={String(c.id)}>
-                        {c.name} - {c.phone}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
           </CardContent>
         </Card>
 

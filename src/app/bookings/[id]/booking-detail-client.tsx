@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,6 +45,7 @@ import {
   updatePassenger,
 } from "@/app/passengers/actions";
 import { issueTicket, cancelTicket } from "@/app/tickets/actions";
+import { setSellingPrice } from "@/app/bookings/actions";
 import { WhatsAppRequestDialog } from "@/components/whatsapp-request-dialog";
 import { BookingQuickActions } from "@/components/booking-quick-actions";
 import { toast } from "sonner";
@@ -107,6 +109,7 @@ export function BookingDetailClient({ booking, airlines, executionCompanies }: {
     0
   );
 
+  const router = useRouter();
   const bookingId = String(booking.id);
   const [activeTab, setActiveTab] = useState("overview");
   const [passengerOpen, setPassengerOpen] = useState(false);
@@ -119,6 +122,13 @@ export function BookingDetailClient({ booking, airlines, executionCompanies }: {
   } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [whatsappOpen, setWhatsappOpen] = useState(false);
+  const [priceOpen, setPriceOpen] = useState(false);
+  const [priceValue, setPriceValue] = useState(
+    Number(booking.current_selling_price) > 0
+      ? String(booking.current_selling_price)
+      : ""
+  );
+  const [priceReason, setPriceReason] = useState("");
 
   async function handlePassengerSubmit(formData: FormData) {
     setPassengerSubmitting(true);
@@ -254,9 +264,33 @@ export function BookingDetailClient({ booking, airlines, executionCompanies }: {
         <CardContent className="p-4">
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <div className="text-xs text-muted-foreground">سعر البيع</div>
+              <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                سعر البيع
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5"
+                  onClick={() => {
+                    setPriceValue(
+                      Number(booking.current_selling_price) > 0
+                        ? String(booking.current_selling_price)
+                        : ""
+                    );
+                    setPriceReason("");
+                    setPriceOpen(true);
+                  }}
+                  title="تحديد سعر البيع"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </div>
               <div className="text-xl font-bold">
                 <EGPAmount amount={booking.current_selling_price} />
+                {Number(booking.current_selling_price) === 0 && (
+                  <div className="text-[10px] font-normal text-amber-600">
+                    لم يُحدَّد بعد
+                  </div>
+                )}
               </div>
             </div>
             <div>
@@ -918,6 +952,83 @@ export function BookingDetailClient({ booking, airlines, executionCompanies }: {
         targetLabel={booking.execution_company?.name}
         targetPhone={booking.execution_company?.phone}
       />
+
+      {/* Set selling price dialog */}
+      <Dialog open={priceOpen} onOpenChange={setPriceOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>تحديد سعر البيع</DialogTitle>
+            <DialogDescription>
+              حدد/عدّل سعر البيع للعميل. يُسجَّل التغيير في تاريخ الأسعار ويحدِّث
+              الربح والمتبقي تلقائيًا.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const amount = Number(priceValue);
+              if (!Number.isFinite(amount) || amount < 0) {
+                toast.error("خطأ", { description: "أدخل سعر بيع صحيح" });
+                return;
+              }
+              startTransition(async () => {
+                try {
+                  await setSellingPrice({
+                    booking_id: bookingId,
+                    selling_price: amount,
+                    reason: priceReason || undefined,
+                  });
+                  toast.success("تم الحفظ", {
+                    description: "تم تحديث سعر البيع",
+                  });
+                  setPriceOpen(false);
+                  router.refresh();
+                } catch (err: any) {
+                  toast.error("خطأ", {
+                    description: err.message || "حدث خطأ",
+                  });
+                }
+              });
+            }}
+          >
+            <div className="space-y-2">
+              <Label>سعر البيع (ج.م)</Label>
+              <Input
+                autoFocus
+                type="number"
+                step="0.01"
+                min="0"
+                dir="ltr"
+                className="text-left"
+                placeholder="0.00"
+                value={priceValue}
+                onChange={(e) => setPriceValue(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>سبب التغيير (اختياري)</Label>
+              <Input
+                placeholder="مثال: اتفاق مع العميل على السعر"
+                value={priceReason}
+                onChange={(e) => setPriceReason(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPriceOpen(false)}
+              >
+                إلغاء
+              </Button>
+              <Button type="submit" disabled={isPending}>
+                {isPending ? "جاري الحفظ..." : "حفظ سعر البيع"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

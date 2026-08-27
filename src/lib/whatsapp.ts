@@ -59,7 +59,6 @@ export function formatPhoneForWhatsApp(phone?: string | null): string {
 }
 
 export function buildBookingRequestMessage(booking: WhatsAppSource): string {
-  const customerName = booking.customer?.name?.trim();
   const from = booking.flight_segments?.[0]?.from_location?.trim();
   const to = booking.flight_segments?.[0]?.to_location?.trim();
   const date = fmtDate(booking.depart_date);
@@ -87,14 +86,6 @@ export function buildBookingRequestMessage(booking: WhatsAppSource): string {
   lines.push("- صلاحية العرض");
   lines.push("- شروط الدفع");
   lines.push("");
-  if (customerName) {
-    const customerPhone = booking.customer?.phone?.trim();
-    lines.push(
-      customerPhone
-        ? `العميل: ${customerName} (${customerPhone})`
-        : `العميل: ${customerName}`
-    );
-  }
   lines.push(`مرجع الحجز: ${reference}`);
   lines.push("");
   lines.push("شكرًا لتعاونكم.");

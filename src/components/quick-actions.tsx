@@ -26,6 +26,7 @@ import {
 } from "@/app/dashboard/actions";
 import { AirportCombobox } from "@/components/airport-combobox";
 import { getAirportLabel, type Airport } from "@/lib/airports";
+import { CustomerField, type CustomerSelection } from "@/components/customer-field";
 import { BookingWhatsAppDialog } from "@/components/booking-created-whatsapp-dialog";
 import type { WhatsAppSource } from "@/lib/whatsapp";
 
@@ -64,7 +65,7 @@ export function QuickActions({
   const router = useRouter();
   const [open, setOpen] = useState<QuickAction>(null);
   const [pending, startTransition] = useTransition();
-  const [isNewCustomer, setIsNewCustomer] = useState(false);
+  const [customer, setCustomer] = useState<CustomerSelection>(null);
   const [paymentBookingId, setPaymentBookingId] = useState<string>("");
   const [paymentAmount, setPaymentAmount] = useState<string>("");
 
@@ -73,7 +74,7 @@ export function QuickActions({
   const [createdSource, setCreatedSource] = useState<{ id: string; source: WhatsAppSource } | null>(null);
 
   function resetBookingForm() {
-    setIsNewCustomer(false);
+    setCustomer(null);
     setBookingOrigin(null);
     setBookingDestination(null);
   }
@@ -96,7 +97,7 @@ export function QuickActions({
     : 0;
 
   function handle(act: Exclude<QuickAction, null>) {
-    setIsNewCustomer(false);
+    setCustomer(null);
     setPaymentBookingId("");
     setPaymentAmount("");
     if (act !== "new-booking") resetBookingForm();
@@ -147,12 +148,12 @@ export function QuickActions({
             onSubmit={(e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
-              let customerName = customers.find((c) => String(c.id) === (fd.get("customer_id") as string))?.name;
-              let customerPhone: string | undefined = customers.find((c) => String(c.id) === (fd.get("customer_id") as string))?.phone;
-              if (isNewCustomer) {
-                customerName = (fd.get("new_customer_name") as string) || undefined;
-                customerPhone = (fd.get("new_customer_phone") as string) || undefined;
+              if (!customer) {
+                toast.error("خطأ", { description: "اختر العميل أو أضف عميلًا جديدًا" });
+                return;
               }
+              const customerName = customer.name;
+              const customerPhone = customer.phone;
               const source: WhatsAppSource = {
                 customer: customerName ? { name: customerName, phone: customerPhone } : null,
                 depart_date: (fd.get("depart_date") as string) || null,
@@ -169,15 +170,9 @@ export function QuickActions({
               startTransition(async () => {
                 try {
                   const res = await createBookingRequestQuick({
-                    customer_id: isNewCustomer
-                      ? undefined
-                      : ((fd.get("customer_id") as string) || undefined),
-                    new_customer_name: isNewCustomer
-                      ? ((fd.get("new_customer_name") as string) || undefined)
-                      : undefined,
-                    new_customer_phone: isNewCustomer
-                      ? ((fd.get("new_customer_phone") as string) || undefined)
-                      : undefined,
+                    customer_id: customer.kind === "existing" ? customer.id : undefined,
+                    new_customer_name: customer.kind === "new" ? customer.name : undefined,
+                    new_customer_phone: customer.kind === "new" ? customer.phone : undefined,
                     origin: bookingOrigin ? getAirportLabel(bookingOrigin) : (fd.get("origin") as string),
                     destination: bookingDestination ? getAirportLabel(bookingDestination) : (fd.get("destination") as string),
                     depart_date: fd.get("depart_date") as string,
@@ -197,31 +192,16 @@ export function QuickActions({
             className="space-y-3"
           >
             <div className="space-y-2">
-              <div className="flex gap-2">
-                <Button type="button" size="sm" variant={isNewCustomer ? "outline" : "default"} onClick={() => setIsNewCustomer(false)}>
-                  عميل موجود
-                </Button>
-                <Button type="button" size="sm" variant={isNewCustomer ? "default" : "outline"} onClick={() => setIsNewCustomer(true)}>
-                  عميل جديد
-                </Button>
-              </div>
-              {isNewCustomer ? (
-                <div className="grid grid-cols-2 gap-2">
-                  <Input name="new_customer_name" placeholder="اسم العميل" required />
-                  <Input name="new_customer_phone" placeholder="رقم الهاتف" required dir="ltr" className="text-left" />
-                </div>
-              ) : (
-                <Select name="customer_id" required defaultValue={customers[0] ? String(customers[0].id) : ""}>
-                  <SelectTrigger><SelectValue placeholder="اختر العميل..." /></SelectTrigger>
-                  <SelectContent>
-                    {customers.map((c) => (
-                      <SelectItem key={String(c.id)} value={String(c.id)}>
-                        {c.name} - {c.phone}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              <Label>العميل (اكتب الاسم أو رقم الهاتف)</Label>
+              <CustomerField
+                customers={customers.map((c) => ({
+                  id: String(c.id),
+                  name: c.name,
+                  phone: c.phone,
+                }))}
+                value={customer}
+                onChange={setCustomer}
+              />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
