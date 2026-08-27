@@ -30,7 +30,7 @@ function verifyToken(token: string): boolean {
 
 const PUBLIC_PATHS = ["/login", "/api/auth"];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isPublic = PUBLIC_PATHS.some(
