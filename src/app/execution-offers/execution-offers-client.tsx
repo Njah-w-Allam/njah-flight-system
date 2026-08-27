@@ -74,7 +74,7 @@ const offerTypeMap: Record<string, string> = {
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("ar-EG", {
+  return new Date(dateStr).toLocaleDateString("ar-EG-u-nu-latn", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -83,7 +83,7 @@ function formatDate(dateStr: string | null) {
 
 function formatDateTime(dateStr: string | null) {
   if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleString("ar-EG", {
+  return new Date(dateStr).toLocaleString("ar-EG-u-nu-latn", {
     year: "numeric",
     month: "short",
     day: "numeric",

@@ -25,20 +25,43 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
-const navItems = [
-  { href: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard },
-  { href: "/upcoming-tickets", label: "التذاكر القريبة", icon: Ticket },
-  { href: "/bookings", label: "الحجوزات", icon: CalendarCheck },
-  { href: "/customers", label: "العملاء", icon: Users },
-  { href: "/execution-companies", label: "شركات التنفيذ", icon: Building2 },
-  { href: "/booking-requests", label: "طلبات الحجز", icon: ClipboardList },
-  { href: "/execution-offers", label: "عروض شركات التنفيذ", icon: FileText },
-  { href: "/passengers", label: "المسافرين", icon: UserCheck },
-  { href: "/tickets", label: "التذاكر", icon: Ticket },
-  { href: "/customer-payments", label: "مدفوعات العملاء", icon: CreditCard },
-  { href: "/execution-payments", label: "مدفوعات شركات التنفيذ", icon: CreditCard },
-  { href: "/modifications", label: "التعديلات والإلغاء", icon: RotateCcw },
-  { href: "/reports", label: "التقارير", icon: BarChart3 },
+const navGroups: { title: string; items: { href: string; label: string; icon: React.ComponentType<{ className?: string }> }[] }[] = [
+  {
+    title: "المتابعة اليومية",
+    items: [
+      { href: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard },
+      { href: "/upcoming-tickets", label: "التذاكر القريبة", icon: Ticket },
+    ],
+  },
+  {
+    title: "دورة الحجز",
+    items: [
+      { href: "/booking-requests", label: "طلبات الحجز", icon: ClipboardList },
+      { href: "/execution-offers", label: "عروض شركات التنفيذ", icon: FileText },
+      { href: "/bookings", label: "الحجوزات", icon: CalendarCheck },
+      { href: "/passengers", label: "المسافرين", icon: UserCheck },
+      { href: "/tickets", label: "التذاكر", icon: Ticket },
+    ],
+  },
+  {
+    title: "المالية",
+    items: [
+      { href: "/customer-payments", label: "مدفوعات العملاء", icon: CreditCard },
+      { href: "/execution-payments", label: "مدفوعات شركات التنفيذ", icon: CreditCard },
+      { href: "/modifications", label: "التعديلات والإلغاء", icon: RotateCcw },
+    ],
+  },
+  {
+    title: "البيانات الأساسية",
+    items: [
+      { href: "/customers", label: "العملاء", icon: Users },
+      { href: "/execution-companies", label: "شركات التنفيذ", icon: Building2 },
+    ],
+  },
+  {
+    title: "التحليلات",
+    items: [{ href: "/reports", label: "التقارير", icon: BarChart3 }],
+  },
 ];
 
 function NavLink({
@@ -87,14 +110,21 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
         <Plane className="h-6 w-6 text-primary" />
         <h1 className="text-lg font-bold">نظام الحجوزات</h1>
       </div>
-      <nav className="flex-1 space-y-1 p-3">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.href}
-            {...item}
-            isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
-            onClick={onNavClick}
-          />
+      <nav className="flex-1 space-y-4 overflow-y-auto p-3">
+        {navGroups.map((group) => (
+          <div key={group.title} className="space-y-1">
+            <p className="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+              {group.title}
+            </p>
+            {group.items.map((item) => (
+              <NavLink
+                key={item.href}
+                {...item}
+                isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
+                onClick={onNavClick}
+              />
+            ))}
+          </div>
         ))}
       </nav>
       <div className="border-t p-3">

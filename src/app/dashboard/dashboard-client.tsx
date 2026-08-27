@@ -32,7 +32,7 @@ interface DashboardProps {
 }
 
 function formatDate(date: string | Date) {
-  return new Date(date).toLocaleDateString("ar-EG", {
+  return new Date(date).toLocaleDateString("ar-EG-u-nu-latn", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -40,7 +40,7 @@ function formatDate(date: string | Date) {
 }
 
 function formatDateTime(date: string | Date) {
-  return new Date(date).toLocaleString("ar-EG", {
+  return new Date(date).toLocaleString("ar-EG-u-nu-latn", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -74,7 +74,7 @@ export function DashboardClient({
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">لوحة التحكم</h1>
         <span className="text-sm text-muted-foreground">
-          {new Date().toLocaleDateString("ar-EG", {
+          {new Date().toLocaleDateString("ar-EG-u-nu-latn", {
             weekday: "long",
             year: "numeric",
             month: "long",

@@ -78,7 +78,7 @@ const methodFilters: { value: string; label: string }[] = [
 ];
 
 function formatDate(date: Date | string) {
-  return new Date(date).toLocaleDateString("ar-EG", {
+  return new Date(date).toLocaleDateString("ar-EG-u-nu-latn", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -86,7 +86,7 @@ function formatDate(date: Date | string) {
 }
 
 function formatDateTime(date: Date | string) {
-  return new Date(date).toLocaleString("ar-EG", {
+  return new Date(date).toLocaleString("ar-EG-u-nu-latn", {
     year: "numeric",
     month: "short",
     day: "numeric",

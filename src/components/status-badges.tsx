@@ -45,12 +45,12 @@ const paymentStatusMap: Record<payment_status_enum, { label: string; variant: "d
   overdue: { label: "متأخر", variant: "destructive" },
 };
 
-const requestStatusMap: Record<booking_request_status_enum, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  NEW: { label: "جديد", variant: "secondary" },
-  WAITING_FOR_OFFERS: { label: "بانتظار العروض", variant: "outline" },
-  OFFER_SELECTED: { label: "تم اختيار عرض", variant: "default" },
-  CONVERTED: { label: "تم التحويل", variant: "default" },
-  CANCELLED: { label: "ملغي", variant: "destructive" },
+const requestStatusMap: Record<booking_request_status_enum, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; className: string }> = {
+  NEW: { label: "جديد", variant: "outline", className: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20" },
+  WAITING_FOR_OFFERS: { label: "بانتظار العروض", variant: "outline", className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20" },
+  OFFER_SELECTED: { label: "تم اختيار عرض", variant: "outline", className: "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20" },
+  CONVERTED: { label: "تم التحويل", variant: "outline", className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" },
+  CANCELLED: { label: "ملغي", variant: "destructive", className: "" },
 };
 
 const offerStatusMap: Record<offer_status_enum, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -82,7 +82,11 @@ export function PaymentStatusBadge({ status }: { status: payment_status_enum }) 
 
 export function RequestStatusBadge({ status }: { status: booking_request_status_enum }) {
   const config = requestStatusMap[status];
-  return <Badge variant={config.variant}>{config.label}</Badge>;
+  return (
+    <Badge variant={config.variant} className={config.className}>
+      {config.label}
+    </Badge>
+  );
 }
 
 export function OfferStatusBadge({ status }: { status: offer_status_enum }) {
@@ -93,7 +97,7 @@ export function OfferStatusBadge({ status }: { status: offer_status_enum }) {
 export function EGPAmount({ amount }: { amount: number | string }) {
   return (
     <span className="num-ltr">
-      {Number(amount).toLocaleString("ar-EG", { minimumFractionDigits: 2 })} ج.م
+      {Number(amount).toLocaleString("ar-EG-u-nu-latn", { minimumFractionDigits: 2 })} ج.م
     </span>
   );
 }

@@ -47,7 +47,7 @@ const paymentMethodMap: Record<payment_method_enum, string> = {
 
 function formatDate(date: Date | string | null) {
   if (!date) return "—";
-  return new Date(date).toLocaleDateString("ar-EG", {
+  return new Date(date).toLocaleDateString("ar-EG-u-nu-latn", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -56,7 +56,7 @@ function formatDate(date: Date | string | null) {
 
 function formatDateTime(date: Date | string | null) {
   if (!date) return "—";
-  return new Date(date).toLocaleString("ar-EG", {
+  return new Date(date).toLocaleString("ar-EG-u-nu-latn", {
     year: "numeric",
     month: "short",
     day: "numeric",

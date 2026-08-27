@@ -123,7 +123,7 @@ const bookingStatusLabels: Record<booking_status_enum, string> = {
 };
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("ar-EG", {
+  return new Date(dateStr).toLocaleDateString("ar-EG-u-nu-latn", {
     year: "numeric",
     month: "short",
     day: "numeric",

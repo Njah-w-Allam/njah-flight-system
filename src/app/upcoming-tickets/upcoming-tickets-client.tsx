@@ -33,7 +33,7 @@ interface Ticket {
 }
 
 function formatDateTime(date: Date | string) {
-  return new Date(date).toLocaleString("ar-EG", {
+  return new Date(date).toLocaleString("ar-EG-u-nu-latn", {
     month: "short",
     day: "numeric",
     hour: "2-digit",

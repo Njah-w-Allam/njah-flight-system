@@ -66,7 +66,7 @@ interface BookingOption {
 
 function formatDate(date: Date | string | null) {
   if (!date) return "—";
-  return new Date(date).toLocaleDateString("ar-EG", {
+  return new Date(date).toLocaleDateString("ar-EG-u-nu-latn", {
     year: "numeric",
     month: "short",
     day: "numeric",
