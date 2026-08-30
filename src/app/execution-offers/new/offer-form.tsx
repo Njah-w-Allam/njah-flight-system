@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createExecutionOffer, createAirline } from "../actions";
+import { FastOfferPanel, AppliedOffer } from "./fast-offer-panel";
 
 interface Request {
   id: string;
@@ -78,6 +79,16 @@ export function OfferForm({ requests, executionCompanies, airlines }: Props) {
     }
   }
 
+  function handleApplyFromPanel(offer: AppliedOffer) {
+    if (offer.airlineId) setAirlineId(offer.airlineId);
+    if (offer.offerType) setOfferType(offer.offerType);
+    if (offer.executionCost !== undefined) setExecutionCost(offer.executionCost);
+    if (offer.flightDetails) setFlightDetails(offer.flightDetails);
+    if (offer.ticketingDeadline) setTicketingDeadline(offer.ticketingDeadline);
+    if (offer.paymentDeadline) setPaymentDeadline(offer.paymentDeadline);
+    if (offer.notes) setNotes((n) => (n ? `${n}\n${offer.notes}` : offer.notes!));
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -127,7 +138,9 @@ export function OfferForm({ requests, executionCompanies, airlines }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <>
+      <FastOfferPanel airlines={airlineList} onApply={handleApplyFromPanel} />
+      <form onSubmit={handleSubmit}>
       <Card>
         <CardContent className="pt-6 space-y-6">
           {error && (
@@ -314,6 +327,7 @@ export function OfferForm({ requests, executionCompanies, airlines }: Props) {
           </div>
         </CardContent>
       </Card>
-    </form>
+      </form>
+    </>
   );
 }
