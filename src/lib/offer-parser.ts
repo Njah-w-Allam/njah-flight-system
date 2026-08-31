@@ -9,6 +9,7 @@ export interface ParsedOffer {
   executionCost?: number;
   offerType?: "economy" | "business" | "other";
   flightDetails?: string;
+  destination?: string; // extracted route, e.g. "CAI → JED"
   ticketingDeadline?: string; // ISO datetime-local value
   paymentDeadline?: string; // ISO datetime-local value
   confidence: number; // 0..1 heuristic confidence that at least cost was found
@@ -91,9 +92,18 @@ const AIRPORT_CODES = new Set([
 ]);
 
 function findRouteFromAirportCodes(text: string): { from: string; to: string } | undefined {
-  const codes = text.toUpperCase().match(/\b([A-Z]{3})\b/g) || [];
-  const matches = codes.filter((c) => AIRPORT_CODES.has(c));
-  if (matches.length >= 2) return { from: matches[0], to: matches[1] };
+  // Airport codes may be glued to fare/class suffixes, e.g. "CAIT1" or "JEDNT".
+  // Match a known IATA prefix at a token start (bound by space or line start).
+  const codeList = Array.from(AIRPORT_CODES);
+  const alt = codeList.join("|");
+  const re = new RegExp(`(?:^|[\\s\\n])(${alt})[A-Z0-9]*`, "g");
+  const found: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text.toUpperCase())) !== null) {
+    if (found.indexOf(m[1]) === -1) found.push(m[1]);
+    if (found.length >= 2) break;
+  }
+  if (found.length >= 2) return { from: found[0], to: found[1] };
   return undefined;
 }
 
@@ -193,6 +203,8 @@ export function parseOfferText(rawText: string): ParsedOffer {
   const executionCost = parseAmount(text) ?? findBareCost(text);
   const offerType = findOfferType(text);
   const flightDetails = findFlightDetails(text);
+  const route = findRouteFromAirportCodes(text);
+  const destination = route ? `${route.from} → ${route.to}` : findFlightDetails(text);
 
   let ticketingDeadline: string | undefined;
   let paymentDeadline: string | undefined;
@@ -228,6 +240,7 @@ export function parseOfferText(rawText: string): ParsedOffer {
     executionCost,
     offerType: offerType === "other" ? undefined : offerType,
     flightDetails,
+    destination,
     ticketingDeadline,
     paymentDeadline,
     confidence: executionCost ? 0.9 : 0.3,

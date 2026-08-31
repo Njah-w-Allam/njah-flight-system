@@ -16,10 +16,12 @@ export interface AppliedOffer {
   ticketingDeadline?: string;
   paymentDeadline?: string;
   notes?: string;
+  matchedRequestId?: string; // inferred from the parsed وجهة (route)
 }
 
 interface Props {
   airlines: Array<{ id: string; name: string; code: string | null }>;
+  requests: Array<{ id: string; origin: string; destination: string }>;
   onApply: (offer: AppliedOffer) => void;
 }
 
@@ -67,7 +69,7 @@ function buildRows(parsed: ParsedOffer, airlines: Props["airlines"]): ReviewRow[
   return rows;
 }
 
-export function FastOfferPanel({ airlines, onApply }: Props) {
+export function FastOfferPanel({ airlines, requests, onApply }: Props) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [imageName, setImageName] = useState<string | null>(null);
@@ -76,7 +78,40 @@ export function FastOfferPanel({ airlines, onApply }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ReviewRow[] | null>(null);
   const [unmatchedAirline, setUnmatchedAirline] = useState<string | null>(null);
+  const [matchedRequest, setMatchedRequest] = useState<
+    | { id: string; label: string }
+    | "none"
+    | null
+  >(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Match a parsed route (e.g. "CAI → JED") to a booking request's route so the
+  // created offer inherits the correct وجهة (destination). Airline airport codes
+  // are mapped to the Arabic city names stored on booking requests.
+  const AIRPORT_TO_ARABIC: Record<string, string> = {
+    CAI: "القاهرة", JED: "جدة", RUH: "الرياض", DMM: "الدمام", MED: "المدينة",
+    ADB: "إزمير", DXB: "دبي", AUH: "أبوظبي", DOH: "الدوحة", KWI: "الكويت",
+    AMM: "عمّان", MCT: "مسقط", IST: "إسطنبول", SAW: "إسطنبول صبيحة", CMN: "الدار البيضاء",
+    TUN: "تونس", ALG: "الجزائر", LHR: "لندن", CDG: "باريس", FRA: "فرانكفورت",
+    BGW: "بغداد", BKK: "بانكوك", HBE: "برج العرب", LXR: "الأقصر", SSH: "شرم الشيخ",
+    HRG: "الغردقة", ASW: "أسوان",
+  };
+
+  function matchRequest(text: string): { id: string; label: string } | undefined {
+    const m = text.toUpperCase().match(/\b([A-Z]{3})[A-Z0-9]*\s*(?:→|->)?\s*([A-Z]{3})[A-Z0-9]*/);
+    if (!m) return undefined;
+    const from = String(AIRPORT_TO_ARABIC[m[1]] || "").trim();
+    const to = String(AIRPORT_TO_ARABIC[m[2]] || "").trim();
+    if (!from && !to) return undefined;
+    const req = requests.find(
+      (r) =>
+        (from ? String(r.origin).trim() === from : true) &&
+        (to ? String(r.destination).trim() === to : true)
+    );
+    return req
+      ? { id: req.id, label: `#${req.id} - ${req.origin} → ${req.destination}` }
+      : undefined;
+  }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -118,6 +153,8 @@ export function FastOfferPanel({ airlines, onApply }: Props) {
       }
       const built = buildRows(parsed, airlines);
       setUnmatchedAirline(parsed.airline && !matchAirline(parsed, airlines) ? parsed.airline : null);
+      const matched = matchRequest(parsed.destination || parsed.flightDetails || text);
+      setMatchedRequest(matched ? matched : (parsed.destination ? "none" : null));
       setRows(built);
       if (!built.length) setError("لم يتم التعرف على أية بيانات قابلة للتعبئة");
     } finally {
@@ -148,8 +185,12 @@ export function FastOfferPanel({ airlines, onApply }: Props) {
         applied.notes = unmatchedAirline ? `الناقل: ${unmatchedAirline}` : r.value;
       }
     });
+    if (matchedRequest && matchedRequest !== "none") {
+      applied.matchedRequestId = matchedRequest.id;
+    }
     onApply(applied);
     setRows(null);
+    setMatchedRequest(null);
     setText("");
     setImageB64(null);
     setImageName(null);
@@ -215,6 +256,16 @@ export function FastOfferPanel({ airlines, onApply }: Props) {
             {rows && rows.length > 0 && (
               <div className="rounded-lg border p-3 space-y-2">
                 <p className="text-sm font-medium">تم التعرف على البيانات — اختر ما تريد تعبئته:</p>
+                {matchedRequest && matchedRequest !== "none" && (
+                  <div className="rounded bg-primary/10 px-3 py-2 text-sm">
+                    وجهة تُطابق الطلب: <span className="font-medium">{matchedRequest.label}</span>
+                  </div>
+                )}
+                {matchedRequest === "none" && (
+                  <div className="rounded bg-amber-100 px-3 py-2 text-sm text-amber-800">
+                    الوجهة المُكتشفة لا تطابق أي طلب مفتوح — اختر الطلب يدوياً من نموذج الإضافة.
+                  </div>
+                )}
                 {rows.map((r) => (
                   <label
                     key={String(r.key)}

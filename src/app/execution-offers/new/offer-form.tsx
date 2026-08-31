@@ -80,6 +80,7 @@ export function OfferForm({ requests, executionCompanies, airlines }: Props) {
   }
 
   function handleApplyFromPanel(offer: AppliedOffer) {
+    if (offer.matchedRequestId) setRequestId(offer.matchedRequestId);
     if (offer.airlineId) setAirlineId(offer.airlineId);
     if (offer.offerType) setOfferType(offer.offerType);
     if (offer.executionCost !== undefined) setExecutionCost(offer.executionCost);
@@ -139,7 +140,7 @@ export function OfferForm({ requests, executionCompanies, airlines }: Props) {
 
   return (
     <>
-      <FastOfferPanel airlines={airlineList} onApply={handleApplyFromPanel} />
+      <FastOfferPanel airlines={airlineList} requests={requests} onApply={handleApplyFromPanel} />
       <form onSubmit={handleSubmit}>
       <Card>
         <CardContent className="pt-6 space-y-6">

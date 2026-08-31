@@ -69,4 +69,20 @@ test.describe("Fast offer paste panel", () => {
     ).toBeVisible();
     await expect(page.locator('input[type="datetime-local"]').first()).toHaveValue("2026-08-30T00:00");
   });
+
+  test("a route matching an open request auto-selects that request (وجهة)", async ({ page }) => {
+    await page.getByRole("button", { name: /لصق عرض بسرعة/ }).click();
+    // CAI→DXB maps to القاهرة → دبي which is an open request.
+    await page.getByLabel("نص العرض (من واتساب / إيميل)").fill(
+      "SV 318 V 01SEP CAI DXB 0930 1125\n13950"
+    );
+    await page.getByRole("button", { name: "تحليل وتعبئة" }).click();
+    // The review box announces the matched request and its وجهة.
+    await expect(page.getByText("وجهة تُطابق الطلب:").first()).toBeVisible();
+
+    await page.getByRole("button", { name: "تعبئة النموذج بالبيانات المختارة" }).click();
+    // The request select (placeholder "اختر الطلب") is now filled with the matched
+    // request — the placeholder is gone, proving the وجهة auto-selected a request.
+    await expect(page.getByText("اختر الطلب")).toHaveCount(0);
+  });
 });
