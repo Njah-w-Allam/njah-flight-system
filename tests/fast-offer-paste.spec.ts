@@ -50,4 +50,23 @@ test.describe("Fast offer paste panel", () => {
     await page.getByRole("button", { name: "تحليل وتعبئة" }).click();
     await expect(page.getByText("الصق نص العرض أو ارفق صورة أولاً")).toBeVisible();
   });
+
+  test("agency-style flight format is parsed into airline, cost and date", async ({ page }) => {
+    await page.getByRole("button", { name: /لصق عرض بسرعة/ }).click();
+    // Real agency response format (airline code + flight no, airport codes, bare price)
+    await page.getByLabel("نص العرض (من واتساب / إيميل)").fill(
+      "NE 170 V 30AUG CAIT1 JEDNT 0530 0745\n13240\n30+7\nSV 318 K 08SEP CAI 2 MED 0930 1125\n13950\n23+23+7"
+    );
+    await page.getByRole("button", { name: "تحليل وتعبئة" }).click();
+    await expect(page.getByText("تم التعرف على البيانات").first()).toBeVisible();
+    await expect(page.getByText("الناقل:", { exact: false }).first()).toBeVisible();
+    await expect(page.getByText("تكلفة التنفيذ:", { exact: false }).first()).toBeVisible();
+
+    await page.getByRole("button", { name: "تعبئة النموذج بالبيانات المختارة" }).click();
+    await expect(page.locator('input[type="number"]')).toHaveValue("13240");
+    await expect(
+      page.locator("[role=combobox]").filter({ hasText: /النيل/ }).first()
+    ).toBeVisible();
+    await expect(page.locator('input[type="datetime-local"]').first()).toHaveValue("2026-08-30T00:00");
+  });
 });

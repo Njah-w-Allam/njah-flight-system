@@ -19,7 +19,27 @@ export interface ParsedOffer {
 const AMOUNT_RE =
   /(?<![A-Za-z0-9])(?:([A-Za-z]{0,4})\s*)?(\d[\d,.]*)\s*(?:ج\.م|ج م|جنيه|EGP|USD|\$|ريال|SAR)/i;
 
-// Airline dictionary: Arabic/common names -> canonical + IATA code.
+// Airlines keyed by IATA 2-letter code so that flight numbers like "SV318"
+// or "NE170" can be resolved to a carrier even when no Arabic name is printed.
+const CODE_TO_AIRLINE: Record<string, string> = {
+  SV: "الخطوط السعودية",
+  MS: "مصر للطيران",
+  EK: "طيران الإمارات",
+  EY: "الاتحاد للطيران",
+  QR: "الخطوط الجوية القطرية",
+  G9: "العربية للطيران",
+  J9: "طيران الجزيرة",
+  WY: "الطيران العماني",
+  KU: "الخطوط الجوية الكويتية",
+  RJ: "الملكية الأردنية",
+  NP: "النيل للطيران",
+  NE: "طيران النيل",
+  SM: "العربية للطيران",
+  FZ: "فلاي دبي",
+  TK: "التركية للطيران",
+  LH: "لوفتهانزا",
+};
+
 const AIRLINES: Array<{ keys: RegExp[]; name: string; code?: string }> = [
   { keys: [/السعودية/i, /saudi/i, /saudia/i], name: "الخطوط السعودية", code: "SV" },
   { keys: [/مصر للطيران/i, /egypt ?air/i, /msr/i], name: "مصر للطيران", code: "MS" },
@@ -59,9 +79,41 @@ function findAirline(text: string): ParsedOffer["airline"] | undefined {
 }
 
 function findAirlineCode(text: string): string | undefined {
-  // A 2-letter IATA code often appears in flight numbers like "SV306".
+  // A 2-letter IATA code often appears in flight numbers like "SV318" or "NE170".
   const m = text.match(/\b([A-Z]{2})\s?\d{2,4}\b/);
-  return m ? m[1] : undefined;
+  return m ? m[1].toUpperCase() : undefined;
+}
+
+const AIRPORT_CODES = new Set([
+  "CAI", "JED", "RUH", "DMM", "MED", "ADB", "DXB", "AUH", "DOH", "KWI",
+  "AMM", "MCT", "IST", "SAW", "CMN", "TUN", "ALG", "LHR", "CDG", "FRA",
+  "BGW", "BKK", "CJB", "HBE", "LXR", "SSH", "HRG", "ASW",
+]);
+
+function findRouteFromAirportCodes(text: string): { from: string; to: string } | undefined {
+  const codes = text.toUpperCase().match(/\b([A-Z]{3})\b/g) || [];
+  const matches = codes.filter((c) => AIRPORT_CODES.has(c));
+  if (matches.length >= 2) return { from: matches[0], to: matches[1] };
+  return undefined;
+}
+
+function findFlightLine(text: string): string | undefined {
+  // Agency format: "<CODE> <num> <class> <DDMMM> <from>... <to> <HHMM> <HHMM>"
+  const line = text
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .find((l) => /^[A-Z]{2}\s?\d{2,4}/.test(l) && /\b\d{4}\b/.test(l));
+  if (!line) return undefined;
+  const code = line.match(/^([A-Z]{2})\s?(\d{2,4})/);
+  const date = line.match(/\b(\d{1,2})([A-Z]{3})\b/);
+  const route = findRouteFromAirportCodes(line);
+  const times = line.match(/\b(\d{4})\b/g);
+  if (!code) return undefined;
+  let out = `${code[1]} ${code[2]}`;
+  if (route) out += ` ${route.from}→${route.to}`;
+  if (date) out += ` ${date[1]}${date[2].toUpperCase()}`;
+  if (times && times.length >= 1) out += ` ${times[0].slice(0, 2)}:${times[0].slice(2)}`;
+  return out;
 }
 
 function findOfferType(text: string): ParsedOffer["offerType"] {
@@ -75,7 +127,35 @@ function findFlightDetails(text: string): string | undefined {
   const normalized = normalizeForLoopup(text);
   // Capture a compact route fragment, e.g. "القاهرة → جدة" / "Cairo - Jeddah".
   const route = normalized.match(/(?:^|\s)([^\s,]+)\s*(?:→|->|➝|➞|—-|—)\s*([^\s,]+)/);
-  return route ? `${route[1]} → ${route[2]}` : undefined;
+  if (route) return `${route[1]} → ${route[2]}`;
+  const airport = findRouteFromAirportCodes(text);
+  if (airport) return `${airport.from} → ${airport.to}`;
+  return findFlightLine(text);
+}
+
+const MONTHS_ENG: Record<string, number> = {
+  JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6,
+  JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12,
+};
+
+// Agency dates like "30AUG" / "08SEP" → "2026-08-30" (best-effort year).
+function parseLiteralDate(m: RegExpMatchArray): string | undefined {
+  const day = Number(m[1]);
+  const month = MONTHS_ENG[m[2].toUpperCase()];
+  if (!day || !month) return undefined;
+  const year = new Date().getFullYear();
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+}
+
+// A standalone bare number (no currency word) — typical agency price e.g. "13240".
+function findBareCost(text: string): number | undefined {
+  const line = text
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .find((l) => /^\d{4,6}(\.\d{1,2})?$/.test(l.replace(/,/g, "")));
+  if (!line) return undefined;
+  const v = Number(line.replace(/,/g, ""));
+  return Number.isFinite(v) && v > 0 ? v : undefined;
 }
 
 // Parse a deadline mention like "الإصدار: 27/09/2026 20:00" or
@@ -106,9 +186,11 @@ function pad2(n: number): string {
 
 export function parseOfferText(rawText: string): ParsedOffer {
   const text = rawText.trim();
-  const airline = findAirline(text);
-  const airlineCodeFromDict = airline ? undefined : findAirlineCode(text);
-  const executionCost = parseAmount(text);
+  const airlineName = findAirline(text);
+  const codeFromFlight = findAirlineCode(text);
+  const airline = airlineName || (codeFromFlight ? CODE_TO_AIRLINE[codeFromFlight] : undefined);
+  const airlineCode = airlineName ? (CODE_TO_AIRLINE[codeFromFlight ?? ""] ? codeFromFlight : undefined) : codeFromFlight;
+  const executionCost = parseAmount(text) ?? findBareCost(text);
   const offerType = findOfferType(text);
   const flightDetails = findFlightDetails(text);
 
@@ -133,13 +215,16 @@ export function parseOfferText(rawText: string): ParsedOffer {
       paymentDeadline = findDeadline(text);
     }
   } else {
-    const d = findDeadline(text);
-    if (d) ticketingDeadline = d;
+    // No explicit deadline keyword: use an agency-style flight date as the
+    // ticketing/deadline date reference (best-effort year, midnight time).
+    const literal = text.match(/\b(\d{1,2})([A-Z]{3})\b/);
+    const d = literal ? parseLiteralDate(literal) : undefined;
+    ticketingDeadline = d ? `${d}T00:00` : findDeadline(text);
   }
 
   return {
     airline,
-    airlineCode: airline ? airlineCodeFromDict : findAirlineCode(text),
+    airlineCode,
     executionCost,
     offerType: offerType === "other" ? undefined : offerType,
     flightDetails,
