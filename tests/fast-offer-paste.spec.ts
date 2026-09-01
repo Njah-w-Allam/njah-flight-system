@@ -85,4 +85,44 @@ test.describe("Fast offer paste panel", () => {
     // request — the placeholder is gone, proving the وجهة auto-selected a request.
     await expect(page.getByText("اختر الطلب")).toHaveCount(0);
   });
+
+  test("parses Arabic-Indic digits and lowercase airline codes", async ({ page }) => {
+    await page.getByRole("button", { name: /لصق عرض بسرعة/ }).click();
+    await page.getByLabel("نص العرض (من واتساب / إيميل)").fill(
+      "sv318 k 30aug cai jed 0520 0735\n١٣٩٥٠"
+    );
+    await page.getByRole("button", { name: "تحليل وتعبئة" }).click();
+    await expect(page.getByText("تم التعرف على البيانات").first()).toBeVisible();
+    await expect(page.getByText("تكلفة التنفيذ:", { exact: false }).first()).toBeVisible();
+
+    await page.getByRole("button", { name: "تعبئة النموذج بالبيانات المختارة" }).click();
+    // Arabic-Indic ١٣٩٥٠ → 13950, and lowercase flight "sv318" resolves to الخطوط السعودية.
+    await expect(page.locator('input[type="number"]')).toHaveValue("13950");
+    await expect(
+      page.locator("[role=combobox]").filter({ hasText: /السعودية/ }).first()
+    ).toBeVisible();
+    await expect(page.locator('input[type="datetime-local"]').first()).toHaveValue("2026-08-30T00:00");
+  });
+
+  test("a pure Arabic-city route is recognized and auto-selects the matching request", async ({ page }) => {
+    await page.getByRole("button", { name: /لصق عرض بسرعة/ }).click();
+    await page.getByLabel("نص العرض (من واتساب / إيميل)").fill(
+      "الخطوط السعودية اقتصادي\nالقاهرة إلى دبي\nالتكلفة 25,000 ج.م"
+    );
+    await page.getByRole("button", { name: "تحليل وتعبئة" }).click();
+    // Faceة detected from Arabic cities and matched to the open القاهرة → دبي request.
+    await expect(page.getByText("وجهة تُطابق الطلب:").first()).toBeVisible();
+    await expect(page.getByText("تفاصيل الرحلة:", { exact: false }).first()).toBeVisible();
+  });
+
+  test("detects business class from Arabic 'أعمال' and European-style price", async ({ page }) => {
+    await page.getByRole("button", { name: /لصق عرض بسرعة/ }).click();
+    await page.getByLabel("نص العرض (من واتساب / إيميل)").fill(
+      "طيران الإمارات كلاس رجال أعمال\nالقاهرة دبي\n13.240,00 ج.م"
+    );
+    await page.getByRole("button", { name: "تحليل وتعبئة" }).click();
+    await expect(page.getByText("تم التعرف على البيانات").first()).toBeVisible();
+    await expect(page.getByText("نوع العرض:", { exact: false }).first()).toBeVisible();
+    await expect(page.getByText("تكلفة التنفيذ:", { exact: false }).first()).toBeVisible();
+  });
 });

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { parseOfferText, ParsedOffer } from "@/lib/offer-parser";
+import { parseOfferText, matchRequestByRoute, routeCities, ParsedOffer } from "@/lib/offer-parser";
 
 export interface AppliedOffer {
   airlineId?: string;
@@ -85,32 +85,17 @@ export function FastOfferPanel({ airlines, requests, onApply }: Props) {
   >(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Match a parsed route (e.g. "CAI → JED") to a booking request's route so the
-  // created offer inherits the correct وجهة (destination). Airline airport codes
-  // are mapped to the Arabic city names stored on booking requests.
-  const AIRPORT_TO_ARABIC: Record<string, string> = {
-    CAI: "القاهرة", JED: "جدة", RUH: "الرياض", DMM: "الدمام", MED: "المدينة",
-    ADB: "إزمير", DXB: "دبي", AUH: "أبوظبي", DOH: "الدوحة", KWI: "الكويت",
-    AMM: "عمّان", MCT: "مسقط", IST: "إسطنبول", SAW: "إسطنبول صبيحة", CMN: "الدار البيضاء",
-    TUN: "تونس", ALG: "الجزائر", LHR: "لندن", CDG: "باريس", FRA: "فرانكفورت",
-    BGW: "بغداد", BKK: "بانكوك", HBE: "برج العرب", LXR: "الأقصر", SSH: "شرم الشيخ",
-    HRG: "الغردقة", ASW: "أسوان",
-  };
-
-  function matchRequest(text: string): { id: string; label: string } | undefined {
-    const m = text.toUpperCase().match(/\b([A-Z]{3})[A-Z0-9]*\s*(?:→|->)?\s*([A-Z]{3})[A-Z0-9]*/);
-    if (!m) return undefined;
-    const from = String(AIRPORT_TO_ARABIC[m[1]] || "").trim();
-    const to = String(AIRPORT_TO_ARABIC[m[2]] || "").trim();
-    if (!from && !to) return undefined;
-    const req = requests.find(
-      (r) =>
-        (from ? String(r.origin).trim() === from : true) &&
-        (to ? String(r.destination).trim() === to : true)
-    );
-    return req
-      ? { id: req.id, label: `#${req.id} - ${req.origin} → ${req.destination}` }
-      : undefined;
+  // Match a parsed route (وجهة) to a booking request's route so the created
+  // offer inherits the correct وجهة. Handles both English airport codes
+  // ("CAI → JED") and Arabic city routes ("القاهرة → جدة").
+  function matchRequest(route?: string): { id: string; label: string } | undefined {
+    const req = matchRequestByRoute(route, requests);
+    if (!req) return undefined;
+    const cities = routeCities(route);
+    return {
+      id: req.id,
+      label: cities ? `#${req.id} - ${cities.origin} → ${cities.destination}` : `#${req.id}`,
+    };
   }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {

@@ -20,6 +20,13 @@ export interface ParsedOffer {
 const AMOUNT_RE =
   /(?<![A-Za-z0-9])(?:([A-Za-z]{0,4})\s*)?(\d[\d,.]*)\s*(?:ج\.م|ج م|جنيه|EGP|USD|\$|ريال|SAR)/i;
 
+// Convert Arabic-Indic (٠-٩) and Persian (۰-۹) digits to Latin 0-9. Agencies
+// frequently paste prices and dates with Eastern Arabic numerals (e.g. ١٣٢٤٠).
+function toLatinDigits(s: string): string {
+  return s.replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+    .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
+}
+
 // Airlines keyed by IATA 2-letter code so that flight numbers like "SV318"
 // or "NE170" can be resolved to a carrier even when no Arabic name is printed.
 const CODE_TO_AIRLINE: Record<string, string> = {
@@ -35,10 +42,22 @@ const CODE_TO_AIRLINE: Record<string, string> = {
   RJ: "الملكية الأردنية",
   NP: "النيل للطيران",
   NE: "طيران النيل",
-  SM: "العربية للطيران",
+  SM: "اير كايرو",
   FZ: "فلاي دبي",
   TK: "التركية للطيران",
   LH: "لوفتهانزا",
+  FT: "فلاي ايجيبت",
+  NEJ: "نسما للطيران",
+  LM: "المصرية العالمية للطيران",
+  XY: "فلاي ناس",
+  F3: "فلاي اديال",
+  DE: "كوندور",
+  W6: "ويز اير",
+  SN: "بروكسل ايرلاينز",
+  AF: "اير فرانس",
+  BA: "الخطوط البريطانية",
+  KC: "اير استانا",
+  WZ: "ريد وينجز",
 };
 
 const AIRLINES: Array<{ keys: RegExp[]; name: string; code?: string }> = [
@@ -51,20 +70,50 @@ const AIRLINES: Array<{ keys: RegExp[]; name: string; code?: string }> = [
   { keys: [/الجزيرة/i, /jazeera/i], name: "طيران الجزيرة", code: "J9" },
   { keys: [/العُمانية|العمانية/i, /oman/i], name: "الطيران العماني", code: "WY" },
   { keys: [/الكويتية/i, /kuwait/i], name: "الخطوط الجوية الكويتية", code: "KU" },
-  { keys: [/الخطوط الملكية/i, /royal ?jordanian/i], name: "الملكية الأردنية", code: "RJ" },
+  { keys: [/الملكية/i, /الخطوط الملكية/i, /royal ?jordanian/i], name: "الملكية الأردنية", code: "RJ" },
   { keys: [/النيل|air ?nile/i], name: "النيل للطيران", code: "NP" },
+  { keys: [/اير كايرو|air ?cairo/i], name: "اير كايرو", code: "SM" },
+  { keys: [/فلاي ايجيبت|fly ?egypt/i], name: "فلاي ايجيبت", code: "FT" },
+  { keys: [/نسما|nesma/i], name: "نسما للطيران", code: "NEJ" },
+  { keys: [/المصرية العالمية|almarsa|almasria/i], name: "المصرية العالمية للطيران", code: "LM" },
+  { keys: [/فلاي ناس|flynas/i], name: "فلاي ناس", code: "XY" },
+  { keys: [/فلاي اديال|flyadeal/i], name: "فلاي اديال", code: "F3" },
+  { keys: [/ويز اير|wizz/i], name: "ويز اير", code: "W6" },
+  { keys: [/التركية|turkish/i], name: "التركية للطيران", code: "TK" },
+  { keys: [/اير فرانس|air ?france/i], name: "اير فرانس", code: "AF" },
+  { keys: [/البريطانية|british/i], name: "الخطوط البريطانية", code: "BA" },
+  { keys: [/لوفتهانزا|lufthansa/i], name: "لوفتهانزا", code: "LH" },
 ];
+
+// Airport IATA code → Arabic city name, used to translate a numeric route
+// (e.g. "CAI → JED") into a human-readable وجهة and to match requests.
+export const CODE_TO_ARABIC: Record<string, string> = {  CAI: "القاهرة", JED: "جدة", RUH: "الرياض", DMM: "الدمام", MED: "المدينة",
+  DXB: "دبي", AUH: "أبوظبي", DOH: "الدوحة", KWI: "الكويت", AMM: "عمّان",
+  MCT: "مسقط", IST: "إسطنبول", SAW: "إسطنبول صبيحة", CMN: "الدار البيضاء",
+  TUN: "تونس", ALG: "الجزائر", LHR: "لندن", CDG: "باريس", FRA: "فرانكفورت",
+  BGW: "بغداد", BKK: "بانكوك", HBE: "الإسكندرية (برج العرب)", LXR: "الأقصر",
+  SSH: "شرم الشيخ", HRG: "الغردقة", ASW: "أسوان", ADB: "إزمير", CJB: "كويمباتور",
+};
 
 function normalizeForLoopup(s: string): string {
   // Collapse Arabic tatweel, diacritics and repeated spaces for fuzzy matching.
-  return s.normalize("NFKC").replace(/[\u0640\u064B-\u0652\s]/g, " ").replace(/\s+/g, " ").trim();
+  const latin = toLatinDigits(s);
+  return latin.normalize("NFKC").replace(/[\u0640\u064B-\u0652\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function parseAmount(text: string): number | undefined {
-  const m = text.match(AMOUNT_RE);
+  // Work on digit-normalized text so Arabic-Indic numerals match too.
+  const t = toLatinDigits(text);
+  const m = t.match(AMOUNT_RE);
   if (!m) return undefined;
-  const digits = m[2].replace(/,/g, "");
-  const value = Number(digits);
+  const digits = m[2];
+  // European style "1.234,56" uses a dot as the thousands separator and a comma
+  // as the decimal separator — swap them for the bare-number reader.
+  const normalized =
+    /^\d{1,3}(\.\d{3})+(,\d{2})$/.test(digits)
+      ? digits.replace(/\./g, "").replace(",", ".")
+      : digits.replace(/,/g, "");
+  const value = Number(normalized);
   if (!Number.isFinite(value) || value <= 0) return undefined;
   return value;
 }
@@ -81,8 +130,8 @@ function findAirline(text: string): ParsedOffer["airline"] | undefined {
 
 function findAirlineCode(text: string): string | undefined {
   // A 2-letter IATA code often appears in flight numbers like "SV318" or "NE170".
-  const m = text.match(/\b([A-Z]{2})\s?\d{2,4}\b/);
-  return m ? m[1].toUpperCase() : undefined;
+  const m = toLatinDigits(text).toUpperCase().match(/\b([A-Z]{2})\s?\d{2,4}\b/);
+  return m ? m[1] : undefined;
 }
 
 const AIRPORT_CODES = new Set([
@@ -109,7 +158,8 @@ function findRouteFromAirportCodes(text: string): { from: string; to: string } |
 
 function findFlightLine(text: string): string | undefined {
   // Agency format: "<CODE> <num> <class> <DDMMM> <from>... <to> <HHMM> <HHMM>"
-  const line = text
+  const up = toLatinDigits(text).toUpperCase();
+  const line = up
     .split(/\n+/)
     .map((l) => l.trim())
     .find((l) => /^[A-Z]{2}\s?\d{2,4}/.test(l) && /\b\d{4}\b/.test(l));
@@ -117,24 +167,45 @@ function findFlightLine(text: string): string | undefined {
   const code = line.match(/^([A-Z]{2})\s?(\d{2,4})/);
   const date = line.match(/\b(\d{1,2})([A-Z]{3})\b/);
   const route = findRouteFromAirportCodes(line);
-  const times = line.match(/\b(\d{4})\b/g);
+  const times = line.match(/\b\d{4}\b/g);
   if (!code) return undefined;
   let out = `${code[1]} ${code[2]}`;
   if (route) out += ` ${route.from}→${route.to}`;
-  if (date) out += ` ${date[1]}${date[2].toUpperCase()}`;
+  if (date) out += ` ${date[1]}${date[2]}`;
   if (times && times.length >= 1) out += ` ${times[0].slice(0, 2)}:${times[0].slice(2)}`;
   return out;
 }
 
+const ARABIC_CITIES = [
+  "القاهرة", "جدة", "الرياض", "الدمام", "المدينة", "دبي", "أبوظبي", "الدوحة",
+  "الكويت", "عمّان", "عمان", "مسقط", "إسطنبول", "اسطنبول", "الدار البيضاء",
+  "تونس", "الجزائر", "لندن", "باريس", "فرانكفورت", "بغداد", "بانكوك",
+  "الإسكندرية", "الاسكندرية", "الأقصر", "الاقصر", "شرم الشيخ", "الغردقة", "أسوان",
+];
+
+function findArabicRoute(normalized: string): string | undefined {
+  // "القاهرة → جدة" / "القاهرة - جدة" / "القاهرة إلى جدة" / "من القاهرة إلى جدة"
+  const arrow = normalized.match(
+    new RegExp(
+      `(?:من\\s*)?(${ARABIC_CITIES.join("|")})\\s*(?:→|->|➝|➞|—|ـ\\s*-|إلى|الي|الى)\\s*(${ARABIC_CITIES.join("|")})`
+    )
+  );
+  if (arrow) return `${arrow[1]} → ${arrow[2]}`;
+  return undefined;
+}
+
 function findOfferType(text: string): ParsedOffer["offerType"] {
   const normalized = normalizeForLoopup(text);
-  if (/اقتصادي|اقتصادية|economy/i.test(normalized)) return "economy";
-  if (/بيزنيس|بيزنس|بزنس|business/i.test(normalized)) return "business";
+  if (/اقتصادي|اقتصادية|economy|كلاس واحد|tourist/i.test(normalized)) return "economy";
+  if (/بيزنيس|بيزنس|بزنس|business|رجال أعمال|رجال الاعمال|أعمال|اعمال|فيرست|فرست|first/i.test(normalized)) return "business";
   return "other";
 }
 
 function findFlightDetails(text: string): string | undefined {
   const normalized = normalizeForLoopup(text);
+  // Prefer an Arabic city route (most human-readable) — "القاهرة → جدة".
+  const arabic = findArabicRoute(normalized);
+  if (arabic) return arabic;
   // Capture a compact route fragment, e.g. "القاهرة → جدة" / "Cairo - Jeddah".
   const route = normalized.match(/(?:^|\s)([^\s,]+)\s*(?:→|->|➝|➞|—-|—)\s*([^\s,]+)/);
   if (route) return `${route[1]} → ${route[2]}`;
@@ -159,13 +230,22 @@ function parseLiteralDate(m: RegExpMatchArray): string | undefined {
 
 // A standalone bare number (no currency word) — typical agency price e.g. "13240".
 function findBareCost(text: string): number | undefined {
-  const line = text
+  const up = toLatinDigits(text);
+  const line = up
     .split(/\n+/)
     .map((l) => l.trim())
     .find((l) => /^\d{4,6}(\.\d{1,2})?$/.test(l.replace(/,/g, "")));
-  if (!line) return undefined;
-  const v = Number(line.replace(/,/g, ""));
-  return Number.isFinite(v) && v > 0 ? v : undefined;
+  if (line) {
+    const v = Number(line.replace(/,/g, ""));
+    if (Number.isFinite(v) && v > 0) return v;
+  }
+  // European style "13.240,00" on its own line.
+  const eu = up.split(/\n+/).map((l) => l.trim()).find((l) => /^\d{1,3}(\.\d{3})+(,\d{2})$/.test(l));
+  if (eu) {
+    const v = Number(eu.replace(/\./g, "").replace(",", "."));
+    if (Number.isFinite(v) && v > 0) return v;
+  }
+  return undefined;
 }
 
 // Parse a deadline mention like "الإصدار: 27/09/2026 20:00" or
@@ -194,6 +274,51 @@ function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
 
+export interface RequestLike {
+  id: string;
+  origin: string;
+  destination: string;
+}
+
+// Derive the (origin, destination) city pair from a parsed route/وجهة string.
+// Accepts English airport codes ("CAI → JED") or Arabic city names
+// ("القاهرة إلى جدة"). Returns undefined when it cannot resolve both cities.
+export function routeCities(
+  route: string | undefined
+): { origin: string; destination: string } | undefined {
+  if (!route) return undefined;
+  const up = toLatinDigits(route).toUpperCase();
+  const codes = up.match(/\b([A-Z]{3})[A-Z0-9]*\s*(?:→|->)?\s*([A-Z]{3})[A-Z0-9]*/);
+  if (codes) {
+    const origin = CODE_TO_ARABIC[codes[1]] || codes[1];
+    const destination = CODE_TO_ARABIC[codes[2]] || codes[2];
+    if (origin && destination) return { origin, destination };
+  }
+  // Arabic route like "القاهرة → جدة" / "القاهرة إلى جدة".
+  const arabic = findArabicRoute(normalizeForLoopup(route));
+  if (arabic) {
+    const [from, to] = arabic.split("→").map((s) => s.trim());
+    if (from && to) return { origin: from, destination: to };
+  }
+  return undefined;
+}
+
+// Match a parsed route/وجهة to an open booking request by city pair. Compares on
+// normalized Arabic city names so "CAI" (⇒ القاهرة) matches request origin القاهرة.
+export function matchRequestByRoute(
+  route: string | undefined,
+  requests: RequestLike[]
+): RequestLike | undefined {
+  const cities = routeCities(route);
+  if (!cities) return undefined;
+  const norm = (s?: string) => String(s || "").replace(/[^\p{L}\p{N}]+/gu, "").toLowerCase();
+  const from = norm(cities.origin);
+  const to = norm(cities.destination);
+  return requests.find(
+    (r) => norm(r.origin) === from && norm(r.destination) === to
+  );
+}
+
 export function parseOfferText(rawText: string): ParsedOffer {
   const text = rawText.trim();
   const airlineName = findAirline(text);
@@ -204,7 +329,12 @@ export function parseOfferText(rawText: string): ParsedOffer {
   const offerType = findOfferType(text);
   const flightDetails = findFlightDetails(text);
   const route = findRouteFromAirportCodes(text);
-  const destination = route ? `${route.from} → ${route.to}` : findFlightDetails(text);
+  const arabicRoute = findArabicRoute(normalizeForLoopup(text));
+  const destination = arabicRoute
+    ? arabicRoute
+    : route
+      ? `${CODE_TO_ARABIC[route.from] ?? route.from} → ${CODE_TO_ARABIC[route.to] ?? route.to}`
+      : findFlightDetails(text);
 
   let ticketingDeadline: string | undefined;
   let paymentDeadline: string | undefined;
@@ -229,7 +359,7 @@ export function parseOfferText(rawText: string): ParsedOffer {
   } else {
     // No explicit deadline keyword: use an agency-style flight date as the
     // ticketing/deadline date reference (best-effort year, midnight time).
-    const literal = text.match(/\b(\d{1,2})([A-Z]{3})\b/);
+    const literal = toLatinDigits(text).toUpperCase().match(/\b(\d{1,2})([A-Z]{3})\b/);
     const d = literal ? parseLiteralDate(literal) : undefined;
     ticketingDeadline = d ? `${d}T00:00` : findDeadline(text);
   }
